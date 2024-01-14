@@ -1,0 +1,1384 @@
+---
+title: "CRYPTO PROJ"
+output: html_document
+date: "2023-04-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+
+# Read the Excel file into a data frame
+crypto_df <- read_excel("D:/Dpa Project/DPA PROJECT/crypto_data.xlsx")
+
+
+# Convert the date column to a proper date format
+crypto_df$Date <- as.Date(crypto_df$Date, format = "%d/%m/%Y")
+
+head(crypto_df)
+```
+
+
+## Checking datatypes,missing-values,duplicated-values,general-statitistics
+#DATA DICTIONARY 
+#1.shape :--(1870,9)
+#2.discription of data 
+#3.variable categorization :-numeric,categorical --
+#4.redundant columns
+#5.missing value analysis
+#6.tables utilized for analysis 
+#7.discrete and continuos variables
+```{r}
+# Print the dimensions of the data frame
+cat("shape of data frame: ", dim(crypto_df), "\n")
+cat("*************************************\n")
+# Print the column names
+cat("columns/variables/features in datasets:\n")
+cat(names(crypto_df), "\n")
+cat("*************************************\n")
+
+# Print the numerical columns
+num_cols <- sapply(crypto_df, is.numeric)
+cat("Numerical columns in dataset:\n")
+cat(names(crypto_df[num_cols]), "\n")
+cat("*************************************\n")
+
+# Print the categorical columns
+cat_cols <- sapply(crypto_df, is.factor)
+cat_cols <- cat_cols | sapply(crypto_df, is.character)
+cat("Categorical columns in dataset:\n")
+cat(names(crypto_df[cat_cols]), "\n")
+
+```
+
+```{r}
+str(crypto_df)
+
+```
+
+```{r}
+crypto_df$Date <- as.Date(crypto_df$Date, format = "%d/%m/%Y")
+
+```
+
+```{r}
+str(crypto_df)
+```
+
+
+```{r}
+head(crypto_df)
+```
+
+```{r}
+colSums(is.na(crypto_df))
+
+#no missing values present 
+```
+This will return a vector with the number of missing values in each column of the data frame. If the result shows all zeros, it means there are no missing values present in the data frame. If there are missing values, the corresponding columns will show non-zero values.
+
+```{r}
+library(ggplot2)
+library(viridis)
+
+library(ggplot2)
+library(viridis)
+
+# Create a data frame of the missing values
+missing_df <- data.frame(
+  Name = rep(unique(crypto_df$Name), each = ncol(crypto_df)),
+  Symbol = rep(unique(crypto_df$Symbol), each = ncol(crypto_df)),
+  x = rep(1:ncol(crypto_df), nrow(crypto_df)),
+  y = rep(1:nrow(crypto_df), each = ncol(crypto_df)),
+  value = as.vector(is.na(crypto_df))
+)
+
+# Create the heatmap using ggplot2
+ggplot(missing_df, aes(x, y, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis_d(option = "A", na.value = "grey90") +
+  facet_grid(rows = vars(Name), cols = vars(Symbol), scales = "free", space = "free") +
+  theme_minimal() +
+  labs(title = "Missing Values Heatmap")
+
+```
+
+```{r}
+# Count duplicate rows in the crypto_df data frame
+sum(duplicated(crypto_df))
+
+#no duplicate values is present in dataset
+```
+
+```{r}
+# Generate summary statistics for the crypto_df data frame
+summary(crypto_df)
+
+#Date ranges from :----------->> 1st Jan 2017 to 31 Dec 2018 
+
+#Name and Symbol variables have 10 unique values related to famous crypto-currencies based on market-captilization from
+#the period of 1st Jan 2021 to 6th July 2021 
+
+#maximum value for high variable which represent Highest price on the given day in USD is around 65000 USD(~) which shows how volatile
+#crypto market is 
+
+#similarly maximum value for lowest variable which represent Lowest price on given day in USD is also around 62000 USD.
+
+#So,by looking at the general statistics value one can relate and feel about volatility aspects of crypto markets
+```
+#### Data Wrangling
+
+Also, one thing we noticed -- market caps are quite huge.
+For ease of observing, let's introduce 2 new columns - market_billion_usd,volume_billion _usd which will represent currencies Market Cap in billion USD and Volume in billion USD
+```{r}
+# load the dplyr package
+library(dplyr)
+
+# create the new columns
+crypto_df$market_billion_usd <- crypto_df$Marketcap / 1000000000
+crypto_df$volume_billion_usd <- crypto_df$Volume / 1000000000
+
+# remove the original columns
+crypto_df <- select(crypto_df, -Volume, -Marketcap)
+
+# print the updated dataframe
+head(crypto_df)
+
+```
+
+```{r}
+crypto_df[188:196, ]
+```
+
+```{r}
+unique(crypto_df$Name)
+
+```
+
+As crypto_df dataset has daily price data related to 10-cryptocurrencies so to analyze it in better way lets create subset of data and create dataframes related to each crytptocurrencies to analyze in better way
+
+```{r}
+# create subsets for each cryptocurrency
+bitcoin_df <- subset(crypto_df, Name == "Bitcoin")
+ethereum_df <- subset(crypto_df, Name == "Ethereum")
+binance_df <- subset(crypto_df, Name == "Binance Coin")
+dogecoin_df <- subset(crypto_df, Name == "Dogecoin")
+cardano_df <- subset(crypto_df, Name == "Cardano")
+polkadot_df <- subset(crypto_df, Name == "Polkadot")
+solana_df <- subset(crypto_df, Name == "Solana")
+tether_df <- subset(crypto_df, Name == "Tether")
+xrp_df <- subset(crypto_df, Name == "XRP")
+usd_df <- subset(crypto_df, Name == "USD Coin")
+
+# create a list of all the dataframes
+list_df <- list(bitcoin_df, ethereum_df, binance_df, dogecoin_df, cardano_df, polkadot_df, solana_df, tether_df, xrp_df, usd_df)
+head(list_df[4], n = 2)
+
+```
+```{r}
+write.csv(bitcoin_df, "D:/Dpa Project/DPA PROJECT/Bitcoin.csv", row.names = FALSE)
+```
+
+```{r}
+# create a vector of cryptocurrency names
+crypto_names <- c("Bitcoin", "Ethereum", "Binance Coin", "Dogecoin", "Cardano", "Polkadot", "Solana", "Tether", "XRP", "USD Coin")
+
+# loop through the list of dataframes and print their shape and head
+for (i in seq_along(list_df)) {
+  cat("************************\n")
+  cat(crypto_names[i], "---\n")
+  data <- subset(crypto_df, Name == crypto_names[i])
+  cat("shape of data: ", dim(data), "\n")
+  cat("data information: \n")
+  # display the first 5 rows of the subset
+  print(head(data,5))
+  cat("**************************\n")
+}
+
+```
+
+
+## univariate analysis
+
+Univariate analysis and bivariate analysis are typically performed in the initial stages of data analysis, which is known as exploratory data analysis (EDA). 
+
+Univariate analysis involves examining the distribution and summary statistics of individual variables,
+while bivariate analysis examines the relationship between two variables. 
+
+These analyses can provide insights into the nature of the data and help to identify patterns or trends that may be of interest for further investigation. After EDA, more advanced statistical techniques such as multivariate analysis may be used to model the relationships between multiple variables.
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$High)) / 30
+  p1 <- ggplot(data, aes(x = High)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "High", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = High)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "High", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = High)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "High")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+
+```
+
+```{r}
+library(moments)
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable high")
+  print(summary(list_df[[i]]$High))
+  print(paste("skewness of high:", round(skewness(list_df[[i]]$High), 3)))
+  print(paste("kurtosis of variable high:", round(kurtosis(list_df[[i]]$High), 3)))
+  print("*************************")
+}
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$Low)) / 30
+  p1 <- ggplot(data, aes(x = Low)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "Low", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = Low)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "Low", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = Low)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Low")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+```
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable Low")
+  print(summary(list_df[[i]]$Low))
+  print(paste("skewness of Low:", round(skewness(list_df[[i]]$Low), 3)))
+  print(paste("kurtosis of variable Low:", round(kurtosis(list_df[[i]]$Low), 3)))
+  print("*************************")
+}
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$Open)) / 30
+  p1 <- ggplot(data, aes(x = Open)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "Open", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = Open)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "Open", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = Open)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Open")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+```
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable Open")
+  print(summary(list_df[[i]]$Open))
+  print(paste("skewness of Open:", round(skewness(list_df[[i]]$Open), 3)))
+  print(paste("kurtosis of variable Open:", round(kurtosis(list_df[[i]]$Open), 3)))
+  print("*************************")
+}
+```
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$Close)) / 30
+  p1 <- ggplot(data, aes(x = Close)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "Close", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = Close)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "Close", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = Close)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Close")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+```
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable Close")
+  print(summary(list_df[[i]]$Close))
+  print(paste("skewness of Close:", round(skewness(list_df[[i]]$Close), 3)))
+  print(paste("kurtosis of variable Close:", round(kurtosis(list_df[[i]]$Close), 3)))
+  print("*************************")
+}
+```
+volume_billion_usd
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$volume_billion_usd)) / 30
+  p1 <- ggplot(data, aes(x = volume_billion_usd)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "volume_billion_usd", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = volume_billion_usd)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "volume_billion_usd", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = volume_billion_usd)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "volume_billion_usd")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+```
+
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable volume_billion_usd")
+  print(summary(list_df[[i]]$volume_billion_usd))
+  print(paste("skewness of volume_billion_usd:", round(skewness(list_df[[i]]$volume_billion_usd), 3)))
+  print(paste("kurtosis of variable volume_billion_usd:", round(kurtosis(list_df[[i]]$volume_billion_usd), 3)))
+  print("*************************")
+}
+```
+
+market_billion_usd
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$market_billion_usd)) / 30
+  p1 <- ggplot(data, aes(x = market_billion_usd)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "market_billion_usd", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = market_billion_usd)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "market_billion_usd", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 5, nrow =2)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a list of box plot objects for each cryptocurrency
+boxplot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  p <- ggplot(data, aes(x = "", y = market_billion_usd)) +
+    geom_boxplot(fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "market_billion_usd")
+  return(p)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = boxplot_list, ncol = 5, nrow = 2)
+
+```
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable market_billion_usd")
+  print(summary(list_df[[i]]$market_billion_usd))
+  print(paste("skewness of market_billion_usd:", round(skewness(list_df[[i]]$market_billion_usd), 3)))
+  print(paste("kurtosis of variable market_billion_usd:", round(kurtosis(list_df[[i]]$market_billion_usd), 3)))
+  print("*************************")
+}
+```
+
+# Bivariate analysis
+#price-trend of cryptocurrencies over past  6months from jan-2021 to july-2021
+# #close price trends ---for all 10 coins :
+#we plot the closing price (adjusted) of the cryptos over the period of past 6 months
+#to get a general idea of how the cryptocurrencies performed in the given period.
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the closing price trend for a given cryptocurrency
+plot_price_trend <- function(data, crypto_name) {
+  p <- ggplot(data, aes(x = Date, y = Close)) +
+    geom_line(color = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Closing Price")
+  return(p)
+}
+
+# create a list of line plot objects for each cryptocurrency
+price_trend_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  data$Date <- as.Date(data$Date, "%d-%m-%Y")
+  plot_price_trend(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = price_trend_list, ncol = 4, nrow = 3)
+
+```
+
+
+```{r}
+#VOLUME VS DATE
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the closing price trend for a given cryptocurrency
+plot_price_trend <- function(data, crypto_name) {
+  p <- ggplot(data, aes(x = Date, y = volume_billion_usd)) +
+    geom_line(color = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Volume Billion USD")
+  return(p)
+}
+
+# create a list of line plot objects for each cryptocurrency
+price_trend_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  data$Date <- as.Date(data$Date, "%d-%m-%Y")
+  plot_price_trend(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = price_trend_list, ncol = 4, nrow = 3)
+
+```
+
+### Day-to-day percentage change(Daily returns)
+4. Day-to-day percentage change(Daily returns)
+Daily percentage change in the price of the crypto is calculated on the basis of percentage change between 2 consecutive days’ closing prices.Let’s say if the closing price of the stock yesterday was ₹700 and today the stock closed as ₹750. So, the percentage change is 7.14%. i.e. ((750–700) / 700)*100. 
+Accordingly, we’ll introduce a new column ‘Day_Pct%_Change’ denoting the daily returns in the price of the crypto. 
+
+```{r}
+
+# calculate and print the percentage change in the "Close" column of each cryptocurrency's dataframe
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  data <- list_df[[i]]
+  data$Day_Pct_Change <- diff(data$Close) / lag(data$Close, default = data$Close[1]) * 100
+  list_df[[i]]$Day_Pct_Change <- data$Day_Pct_Change
+  print(head(data, 5))
+}
+
+```
+
+### Representing daily returns in form of a plot for 187 days—
+### bitcoin ----day pct change ---
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the closing price trend for a given cryptocurrency
+plot_price_trend <- function(data, crypto_name) {
+  p <- ggplot(data, aes(x = Date, y = data$Day_Pct_Change)) +
+    geom_line(color = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "", y = "Day_Pct_Change")
+  return(p)
+}
+
+# create a list of line plot objects for each cryptocurrency
+price_trend_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  data$Date <- as.Date(data$Date, "%d-%m-%Y")
+  plot_price_trend(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = price_trend_list, ncol = 4, nrow = 3)
+
+```
+### Plotting daily returns distribution histogram —
+
+Inferences- 
+# #satistics
+# bitcoin_df["Day_Pct%_Change"].describe()
+
+#1.The daily returns histogram is centered about origin. 
+#2.for the past 6 months, the mean daily returns has been about 0.200248
+#3.for most of the days we have daily returns less than 2%
+#4.max percentage change value is 18% and min percentage change value is -13% in past 6 months bitcoin data
+#5.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create a function to plot the histogram for a given cryptocurrency
+plot_histogram <- function(data, crypto_name) {
+  binwidth <- diff(range(data$Day_Pct_Change)) / 30
+  p1 <- ggplot(data, aes(x = Day_Pct_Change)) +
+    geom_histogram(binwidth = binwidth, color = "white", fill = "cornflowerblue") +
+    ggtitle(crypto_name) +
+    labs(x = "Day_Pct_Change", y = "Frequency")
+  
+  p2 <- ggplot(data, aes(x = Day_Pct_Change)) +
+    geom_density(color = "red", fill = "salmon") +
+    labs(x = "Day_Pct_Change", y = "Density") +
+    theme_classic()
+  
+  return(grid.arrange(p1, p2, ncol = 1))
+}
+
+# create a list of plots for each cryptocurrency
+plot_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_histogram(data, crypto_name)
+})
+
+# combine the plots into a grid and display it
+grid.arrange(grobs = plot_list, ncol = 4, nrow =3)
+
+```
+
+```{r}
+# print general statistics, skewness, and kurtosis for each cryptocurrency
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  print(crypto_name)
+  print("general statistics for variable Day_Pct_Change")
+  print(summary(list_df[[i]]$Day_Pct_Change))
+  print(paste("skewness of Day_Pct_Change:", round(skewness(list_df[[i]]$Day_Pct_Change), 3)))
+  print(paste("kurtosis of variable Day_Pct_Change:", round(kurtosis(list_df[[i]]$Day_Pct_Change), 3)))
+  print("*************************")
+}
+```
+
+```{r}
+# create an empty list to store the summary dataframes for each cryptocurrency
+data_df <- list()
+
+# loop through each cryptocurrency's dataframe and compute the summary data
+for (i in seq_along(list_df)) {
+  crypto_name <- unique(list_df[[i]]$Name)
+  data <- list_df[[i]]
+  new_df <- data[which.max(data$Day_Pct_Change), ]
+  data_df[[i]] <- new_df
+}
+
+# concatenate the summary dataframes into a single dataframe and sort by Day_Pct_Change
+new_df <- do.call(rbind, data_df)
+new_df <- new_df[order(new_df$Day_Pct_Change, decreasing = TRUE), ]
+row.names(new_df) <- NULL
+new_df
+
+```
+
+```{r}
+crypto_df
+```
+
+### TREND ANALYSIS
+# 5. Trend Analysis
+# Next we add a new column ‘Trend’ whose values are based on the day-to-day percentage change we calculated above. 
+# Trend is determined from below relationship —
+
+
+Trend analysis is typically a part of time series analysis, which is a subfield of statistics and data analysis that deals with analyzing and interpreting data collected over time. 
+Time series analysis can involve both univariate and multivariate analysis, depending on whether one or multiple variables are being analyzed over time. Trend analysis specifically focuses on identifying and characterizing patterns and trends in time series data, such as long-term increasing or decreasing trends, periodic fluctuations, and seasonal effects.
+
+```{r}
+
+get_trend <- function(x) {
+  if (x > -0.5 & x <= 0.5) {
+    return("Slight or No change")
+  } else if (x > 0.5 & x <= 1) {
+    return("Slight Positive")
+  } else if (x > -1 & x <= -0.5) {
+    return("Slight Negative")
+  } else if (x > 1 & x <= 3) {
+    return("Positive")
+  } else if (x > -3 & x <= -1) {
+    return("Negative")
+  } else if (x > 3 & x <= 7) {
+    return("Among top gainers")
+  } else if (x > -7 & x <= -3) {
+    return("Among top losers")
+  } else if (x > 7) {
+    return("Bull run")
+  } else if (x <= -7) {
+    return("Bear drop")
+  }
+}
+
+for (i in seq_along(list_df)) {
+  data <- list_df[[i]]
+  data$Trend <- sapply(data$Day_Pct_Change, get_trend)
+  list_df[[i]]$Trend <- data$Trend
+  print(head(data, 5))
+}
+
+```
+
+We wish to see how the cryptocurrencies were trending in past 6months from 1st July 2017 to 7th july 2018 (change dates)
+This can be visualized as a pie chart, with each sector representing the percentage of days each trend occurred.
+We’ll plot a pie chart for the ‘Trend’ column to visualize the relative frequency of each trend category. For this,
+we’ll use the groupby() function with the trend column to aggregate all days with the same trend into a single group before plotting the pie chart.
+
+### Visualizing Trend Frequency with Pie-Chart —
+
+
+```{r}
+library(ggplot2)
+
+# define a function to plot the pie chart for a given cryptocurrency
+plot_pie_chart <- function(data, crypto_name) {
+  pie_data <- data %>%
+    group_by(Trend) %>%
+    summarize(count = n()) %>%
+    mutate(percentage = count/sum(count) * 100)
+  
+  p <- ggplot(pie_data, aes(x = "", y = percentage, fill = Trend)) +
+    geom_bar(width = 1, stat = "identity") +
+    coord_polar("y", start = 0) +
+    scale_fill_brewer(palette = "Set2") +
+    ggtitle(crypto_name) +
+    theme_void() +
+    geom_text(aes(label = paste0(round(percentage), "%")), position = position_stack(vjust = 0.5))
+  
+  return(p)
+}
+
+# create a list of pie chart objects for each cryptocurrency
+pie_chart_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_pie_chart(data, crypto_name)
+})
+
+# display each pie chart separately
+for (i in seq_along(pie_chart_list)) {
+  print(pie_chart_list[[i]])
+}
+
+```
+### heatmap to visualize the frequency of trends for different cryptocurrencies.
+
+```{r}
+library(ggplot2)
+
+# create a function to plot the heatmap for a given cryptocurrency
+plot_heatmap <- function(data, crypto_name) {
+  # calculate frequency of each trend
+  trend_freq <- table(data$Trend)
+  # create a dataframe with trend and frequency columns
+  trend_df <- data.frame(Trend = names(trend_freq), Frequency = as.numeric(trend_freq))
+  # create heatmap
+  p <- ggplot(trend_df, aes(x = Trend, y = crypto_name, fill = Frequency)) +
+    geom_tile() +
+    scale_fill_gradient(low = "white", high = "steelblue") +
+    labs(title = crypto_name, x = "Trend", y = "") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  return(p)
+}
+
+# create a list of heatmap objects for each cryptocurrency
+heatmap_list <- lapply(list_df, function(data) {
+  crypto_name <- unique(data$Name)
+  plot_heatmap(data, crypto_name)
+})
+
+# display each heatmap separately
+for (i in seq_along(heatmap_list)) {
+  print(heatmap_list[[i]])
+}
+
+```
+
+### Daily Returns and Volume
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+
+# Define function to calculate and annotate correlation coefficient and p-value
+calc_corr <- function(x, y) {
+  corr <- cor.test(x, y)
+  corr_text <- sprintf("r = %.2f, p = %.2e", corr$estimate, corr$p.value)
+  annotate("text", x = Inf, y = Inf, label = corr_text, hjust = 1.2, vjust = 1.2, size = 5)
+}
+
+# Create a new list containing the Date, Day_Pct_Change, and Volume_(24h) columns for each cryptocurrency
+data_list <- lapply(list_df, function(df) {
+  df[, c("Date", "Day_Pct_Change", "volume_billion_usd")]
+})
+
+# Create a new data frame containing the correlation coefficients and p-values for each cryptocurrency
+corr_df <- data.frame(Cryptocurrency = character(),
+                      Correlation = double(),
+                      P_Value = double(),
+                      stringsAsFactors = FALSE
+                    )
+
+# Loop through list of data frames and calculate correlation coefficients and p-values
+for (i in seq_along(data_list)) {
+  corr <- cor.test(data_list[[i]]$Day_Pct_Change, data_list[[i]]$volume_billion_usd)
+  corr_df[i, "Cryptocurrency"] <- names(data_list)[i]
+  corr_df[i, "Correlation"] <- corr$estimate
+  corr_df[i, "P_Value"] <- corr$p.value
+}
+
+# Create scatter plot with trend line and correlation coefficient/p-value annotation for each cryptocurrency
+scatter_plots <- list()
+for (i in seq_along(data_list)) {
+  scatter_plot <- ggplot(data_list[[i]], aes(x = Day_Pct_Change, y = volume_billion_usd)) +
+    geom_point(alpha = 0.7) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    labs(title = names(data_list)[i], x = "Daily Percentage Change", y = "Volume (24h)") +
+    theme_pubclean() +
+    theme(plot.title = element_text(size = 14, face = "bold")) +
+    calc_corr(data_list[[i]]$Day_Pct_Change, data_list[[i]]$volume_billion_usd)
+  scatter_plots[[i]] <- scatter_plot
+}
+
+# Arrange scatter plots into a grid and display
+scatter_grid <- plot_grid(plotlist = scatter_plots, ncol = 3)
+scatter_grid
+
+```
+
+
+
+
+```{r}
+library(forecast)
+
+# Create an empty list to store the results
+forecast_list <- list()
+
+# Loop over each cryptocurrency dataframe in the list
+for (i in seq_along(list_df)) {
+  # Extract the time series data
+  ts_data <- ts(list_df[[i]]$XRP_Price, frequency = 7)
+  # Fit the ARIMA model
+  arima_fit <- auto.arima(ts_data)
+  # Forecast the next 5 days
+  forecast_data <- forecast(arima_fit, h = 5)
+  # Store the forecast results in the list
+  forecast_list[[i]] <- forecast_data
+}
+
+# Print the forecast results for each cryptocurrency
+for (i in seq_along(forecast_list)) {
+  cat(paste0("Cryptocurrency ", i, ":\n"))
+  print(forecast_list[[i]])
+  cat("\n")
+}
+
+```
+
+#### Top 10 cryptocurrencies in 2021 date range from 1st jan 2021 to 6th july 2021
+
+```{r}
+library(tidyverse)
+
+# Assuming your data is in a dataframe called `crypto_df`
+grouped_data <- crypto_df %>%
+  group_by(Name) %>%
+  summarise(market_billion_usd = last(market_billion_usd)) %>%
+  top_n(10, market_billion_usd) %>%
+  arrange(desc(market_billion_usd))
+
+# Creating the bar chart
+ggplot(grouped_data, aes(x = market_billion_usd, y = reorder(Name, market_billion_usd))) +
+  geom_col(fill = "skyblue", alpha = 0.8) +
+  labs(x = "Market cap (in billion USD)", y = "", title = "Top 10 Currencies by Market Cap") +
+  theme_minimal()
+
+```
+
+
+```{r}
+grouped_data
+```
+```{r}
+# Assuming your data is in a dataframe called `crypto_df`
+grouped_data <- crypto_df %>%
+  group_by(Name) %>%
+  summarise(volume_billion_usd = last(volume_billion_usd)) %>%
+  top_n(10, volume_billion_usd) %>%
+  arrange(desc(volume_billion_usd))
+
+# Creating the bar chart
+ggplot(grouped_data, aes(x = volume_billion_usd, y = reorder(Name, volume_billion_usd))) +
+  geom_col(fill = "skyblue", alpha = 0.8) +
+  labs(x = "Volume (in billion USD)", y = "", title = "Top 10 Currencies by Market Cap") +
+  theme_minimal()
+```
+### Monthly end closing prices for all 10 cryptocurrencies
+
+```{r}
+# Load necessary libraries
+library(xts)
+library(ggplot2)
+library(gridExtra)
+
+# Define function to create joint probability plots
+create_timeplot <- function(data, crypto_name) {
+  # Convert to xts object
+  xts_obj <- xts(data$Close, order.by = data$Date)
+
+  # Plot using ggplot2
+  ggplot() + geom_line(data = xts_obj, aes(x = index(xts_obj), y = coredata(xts_obj)), color = "blue") +
+    geom_vline(xintercept = as.numeric(as.Date(paste(format(index(xts_obj)[endpoints(xts_obj, on = "months")]), "01")) - 1),
+               linetype = "dashed", color = "red") +
+    labs(title = paste("Closing Price for ",crypto_name), x = "Date", y = "Closing Price")
+}
+
+# Define function to loop over list of data frames and create joint probability plots
+create_timeplots <- function(list_df, crypto_names) {
+  plots <- list()
+  for (i in seq_along(list_df)) {
+    data <- list_df[[i]]
+    crypto_name <- crypto_names[i]
+    plots[[i]] <- create_timeplot(data, crypto_name)
+  }
+  return(plots)
+}
+
+# Call function to create joint probability plots and store in a list
+plots <- create_timeplots(list_df, crypto_names)
+
+grid_plot <- grid.arrange(grobs = plots, ncol = 3) # Adjust 'ncol' to change the number of columns
+
+# Print the grid
+print(grid_plot)
+
+```
+
+
+```{r} 
+# Load necessary libraries
+library(xts)
+library(ggplot2)
+
+# Define function to create time series plots
+create_timeplot <- function(data, crypto_name) {
+  # Convert to xts object
+  xts_obj <- xts(data$Close, order.by = data$Date)
+
+  # Get weekly endpoint indices and values
+  weekly_endpoints <- endpoints(xts_obj, on = "weeks")
+  weekly_values <- coredata(xts_obj)[weekly_endpoints]
+
+  # Plot using ggplot2
+  ggplot() +
+    geom_line(data = xts_obj, aes(x = index(xts_obj), y = coredata(xts_obj)), color = "blue") +
+    geom_point(data = data.frame(date = index(xts_obj)[weekly_endpoints], value = weekly_values),
+               aes(x = date, y = value), color = "red", size = 2) +
+    geom_vline(xintercept = as.numeric(as.Date(paste(format(index(xts_obj)[endpoints(xts_obj, on = "months")]), "01")) - 1),
+               linetype = "dashed", color = "red") +
+    labs(title = paste("Closing Price for ",crypto_name),
+         x = "Date", y = "Closing Price")
+}
+
+# Define function to loop over list of data frames and create time series plots
+create_timeplots <- function(list_df, crypto_names) {
+  plots <- list()
+  for (i in seq_along(list_df)) {
+    data <- list_df[[i]]
+    crypto_name <- crypto_names[i]
+    plots[[i]] <- create_timeplot(data, crypto_name)
+  }
+  return(plots)
+}
+
+# Call function to create time series plots and store in a list
+plots <- create_timeplots(list_df, crypto_names)
+
+# Arrange plots in a grid
+for (plot in plots) {
+  print(plot)
+}
+```
+
+
+
+### Experiment
+
+```{r}
+calc_earnings <- function(currency_name, df) {
+  # Displaying stats for currency_name
+  # print(paste("Displaying stats for", currency_name))
+  
+  closing_prices <- df %>%
+    filter(Name == currency_name & !is.na(Close)) %>%
+    select(Date, Close)
+  
+  # Num. currency purchased for 1000$
+  # print(paste("Closing price at the beginning:", closing_prices[1, "Close"]))
+  num_units_purchased <- 1000 / closing_prices[1, "Close"]
+  
+  # print(paste("Num. units purchased:", num_units_purchased))
+  # Current value
+  last_price <- tail(closing_prices$Close, n = 1)
+  # print(paste("Last price:", last_price))
+  amount_earned <- (num_units_purchased * last_price) - 1000
+  # print(paste("Amount you would have earned:", amount_earned, "$"))
+  return(amount_earned)
+}
+```
+```{r}
+crypto_names
+```
+```{r}
+top_10_currencies_earnings <- data.frame()
+
+for (currency in crypto_names) {
+  earnings <- calc_earnings(currency, crypto_df)
+  df <- data.frame(Name = currency, Earnings = earnings)
+  top_10_currencies_earnings <- rbind(top_10_currencies_earnings, df)
+}
+colnames(top_10_currencies_earnings) <- c("Name", "Earnings")
+top_10_currencies_earnings
+```
+
+```{r}
+# Sort the data frame in descending order of Earnings
+top_10_currencies_earnings <- top_10_currencies_earnings %>% 
+  arrange(desc(Earnings))
+top_10_currencies_earnings
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Reorder the levels of Name based on Earnings
+top_10_currencies_earnings$Name <- factor(top_10_currencies_earnings$Name, levels = top_10_currencies_earnings$Name)
+
+# Create the bar plot
+ggplot(top_10_currencies_earnings, aes(x = Name, y = Earnings)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_bw() +
+  labs(x = "Currency", y = "Earnings") +
+  geom_text(aes(label=paste0("$",format(round(Earnings), nsmall=0))),
+            vjust=1.5,
+            size=3.5)
+
+```
+
+#### heatmap -correlation analysis
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(reshape2)
+
+# Example data (replace with your actual data)
+# crypto_df <- data.frame(
+#   Date = as.Date(rep(seq(from = as.Date("2021-01-01"), to = as.Date("2021-01-10"), by = "day"), 10)),
+#   Name = rep(c("Binance Coin", "Bitcoin", "Cardano", "Dogecoin", "Ethereum", "Polkadot", "Solana", "Tether", "USD Coin", "XRP"), each = 10),
+#   Close = rnorm(100, mean = 100, sd = 10)
+# )
+
+# Create cross-tabulated data frame
+cross_tab_crypto <- dcast(crypto_df, Date ~ Name, value.var = "Close", fun.aggregate = sum)
+
+# Calculate correlations
+correlations <- cor(cross_tab_crypto[, -1], use = "complete.obs")
+
+# Plot correlation matrix
+library(corrplot)
+corrplot(correlations, method = "circle")
+
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(viridis)
+
+# Create cross-tabulated data frame
+cross_tab_crypto <- dcast(crypto_df, Date ~ Name, value.var = "Close", fun.aggregate = sum)
+
+# Calculate correlations
+correlations <- cor(cross_tab_crypto[, -1], use = "complete.obs")
+
+# Melt correlation matrix into long format
+melted_cor_matrix <- melt(correlations)
+
+# Create heatmap
+ggplot(melted_cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(name = "Correlation", colours = viridis(100), na.value = "white") +
+  labs(x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5),
+        axis.text.y = element_text(angle = 0, hjust = 0.5)) +
+  geom_text(aes(label = round(value, 2)), color = "white", size = 3) +
+  coord_fixed()
+
+```
+
+The plot shows a heatmap of the correlation matrix between the different cryptocurrency prices over time. Each cell in the heatmap represents the correlation coefficient between two cryptocurrency prices, where a higher correlation coefficient indicates a stronger positive correlation and a lower correlation coefficient indicates a weaker or negative correlation.
+
+By looking at the plot, we can make the following observations:
+
+There is a strong positive correlation between the prices of Bitcoin and most other cryptocurrencies, such as Ethereum, USD Coin, and Tether. This suggests that changes in the price of Bitcoin are likely to have a similar effect on the prices of these cryptocurrencies.
+
+Some cryptocurrencies have weak or negative correlations with each other. For example, the prices of Solana and Cardano have a weak positive correlation, while the prices of Polkadot and Dogecoin have a weak negative correlation. This suggests that changes in the price of one cryptocurrency may not have a significant impact on the prices of these other cryptocurrencies.
+
+There are some cryptocurrencies that have strong positive correlations with each other, but weaker correlations with other cryptocurrencies. For example, the prices of Binance Coin and XRP have a strong positive correlation, but weaker correlations with other cryptocurrencies. This suggests that these cryptocurrencies may be more closely related to each other than to other cryptocurrencies.
+
+Overall, this plot provides a useful visualization of the correlation structure between cryptocurrency prices, which can help us to better understand the relationships between different cryptocurrencies and make informed investment decisions.
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidyquant)
+library(ggplot2)
+library(GGally)
+
+# Example data (replace with your data)
+cross_tab_crypto <- data.frame(
+  BITCOIN = list_df[[1]]$Close,
+  CARDANO = list_df[[2]]$Close,
+  ETHEREUM = list_df[[4]]$Close,
+  XRP = list_df[[9]]$Close
+)
+
+# Calculate daily returns
+pct_chg_df <- cross_tab_crypto %>%
+  mutate_all(funs((. / lag(.) - 1) * 100)) %>%
+  na.omit()
+
+# Create pairplot
+ggpairs(pct_chg_df)
+
+```
+
+
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(reshape2)
+
+# Create cross-tabulated data frame
+cross_tab_crypto <- dcast(crypto_df, Date ~ Name, value.var = "Close", fun.aggregate = sum)
+
+pct_chg_df <- cross_tab_crypto %>%
+  mutate(across(-Date, ~(lag(.)/. - 1) * 100)) %>%
+  na.omit()
+
+# Create pairplot
+ggpairs(pct_chg_df)
+
+```
+
+# Although the pair plots provide very good 
+# visualization of all possible combinations between the bunch of cryptos,
+# it doesn’t provide any detailed information like Pearson’s R value or null-hypothesis p value to quantify the correlation.
+# That’s where the joint plot comes into the picture!
+# While Pair plot provides a visual insight into all possible correlations, Seaborn jointplot provides detailed information like Pearson’s R value 
+# (Pearson’s correlation coefficient) for each pair of cryptos. Pearson’s R value ranges from -1 to 1. Negative value indicates a negative linear 
+# relation between the variables, while positive value indicates a positive relationship. Pearson’s R value closer to 1 (or -1) indicates strong correlation, 
+# while value closer to 0 indicates weak correlation.
+# In addition to Pearson’s R value, joint plot also shows the respective histograms on the edges as well as null hypothesis p-value.
+
+```{r}
+pct_chg_df
+```
+
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(ggpubr)
+
+
+# Create cross-tabulated data frame
+cross_tab_crypto <- dcast(crypto_df, Date ~ Name, value.var = "Close", fun.aggregate = sum)
+
+# Calculate correlations
+correlations <- cor(cross_tab_crypto[, -1], use = "complete.obs")
+
+# Create jointplot for Bitcoin and Ethereum
+ggscatter(cross_tab_crypto, x = "Bitcoin", y = "Ethereum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Bitcoin", ylab = "Ethereum",
+          title = "Bitcoin and Ethereum Jointplot")
+
+# Create jointplot for Polkadot and Ethereum
+ggscatter(cross_tab_crypto, x = "Polkadot", y = "Ethereum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Polkadot", ylab = "Ethereum",
+          title = "Polkadot and Ethereum Jointplot")
+
+
+```
+## Volatility Analysis
+# Volatility is one of the most important pillars in financial markets.
+# A cryptocurrency or stock is said to have high volatility if its value can change dramatically within a short span of time.
+# On other hand, lower volatility means that value of crypto tends to be relatively steady over a period of time. 
+# These movements are due to several factors including demand and supply, 
+# sentiment, corporate actions, greed, and fear, etc. 
+# Mathematically, volatility is measured using a statistical measure called ‘standard deviation’,
+# which measures an asset’s departure from its average value.
+# We have already calculated the intraday returns (daily returns) of the 10 cryptos .
+# Next, we will calculate the 7-day rolling mean(also called moving average) of the daily returns,
+# then compute the standard deviation (which is square root of the variance) and plot the values.
+# Relax, we don’t have to calculate all this manually; Pandas ‘rolling()’ function and ‘std()’ 
+# function does the job for us in just one line!
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(zoo)
+library(ggplot2)
+
+# Combine daily returns for all cryptocurrencies into a single data frame
+crypto1_df <- bind_rows(list_df, .id = "Name")
+
+# Calculate 7-day rolling mean of daily returns for each cryptocurrency
+crypto1_df <- crypto1_df %>%
+  group_by(Name) %>%
+  mutate(rolling_mean = rollmean(Day_Pct_Change, 7, align = "right", fill = NA))
+
+# Calculate 7-day rolling standard deviation of daily returns for each cryptocurrency
+crypto1_df <- crypto1_df %>%
+  group_by(Name) %>%
+  mutate(rolling_std = rollapply(Day_Pct_Change, width = 7, FUN = sd, align = "right", fill = NA))
+
+# Plot rolling standard deviation of daily returns for each cryptocurrency
+ggplot(crypto1_df, aes(x = Date, y = rolling_std, color = Name)) +
+  geom_line() +
+  labs(x = "Date", y = "Standard Deviation", color = "Cryptocurrency")+
+  labs(color = "Cryptocurrency") +
+  scale_color_discrete(name = "Cryptocurrency", labels = unique(crypto_names))
+
+```
+
+#dogecoin seems to be most volatile followed by solana
+#Tether -USDT AND USD coin are least volatile which is also because they are stable coins 
+#Bitcoin seems to be the highest priced cryptocurrency but if compared to other cryptocurrencies its volatility is low 
+#The low volatility of bitcoin can also be understood from its highest market capitalization and price similar to large cap
+#stocks in share market 
+
+# Many traders and investors seek out higher volatility investments in 
+# order to make higher profits. 
+# If a crypto price does not move, not only it has low volatility, 
+# but also it has low gain potential.
+# On the other hand, a crypto price or other security with a very high 
+# volatility level can have tremendous profit potential, but the risk is equally high.
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```

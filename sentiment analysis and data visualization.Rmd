@@ -1,0 +1,910 @@
+```{r}
+# Load required packages
+library(readr)
+library(lubridate)
+library(dplyr)
+
+# Read the CSV file
+df <- read.csv("D:/Dpa Project/DPA PROJECT/sentiment.csv")[, c(2, 8, 9)]
+
+# Rename the columns if needed
+colnames(df) <- c("Date", "Positive Sentiment", "Negative Sentiment")
+
+# Convert the Date column to a date object
+df$Date <- as_date(ymd_hms(df$Date))
+
+# Set the Date column as the index and sort by index
+df <- df %>% arrange(Date)
+
+# Print the dimensions of the dataframe
+print(dim(df))
+
+# Print the first 5 rows
+head(df, 5)
+```
+
+```{r}
+str(df)
+```
+
+The first thing we need to resolve is how to score dates that have more than one Sentiment Score. This means there were several different articles parsed for that day. For instance, we can see below, September 8$^{th}$ had 4 different article parsed
+
+```{r}
+# Sort the dataframe by row names (assuming it's an index)
+df_sorted <- df[order(rownames(df)), ]
+
+# Subset the dataframe to rows 26 to 30 (inclusive)
+df_subset <- df_sorted[26:30, ]
+df_subset
+```
+
+There's a few ways we can handle this situation. We can take the Average of these values to give an overall sentiment for the day. A better way to average values to better represent orders of magnitude of each individual value is the Root Mean Square (RMS) which is simplyt $\sqrt{x_1^2 + x_2^2 + ... + x_n^2}$. And finally, we can simply sum the values. After performing this aggregations, let's then combine the negative and positive sentiment score to create some meaningful "Overall Sentiment" for each day. We will do this by simply summing the Positive Sentiment and Negative Sentiment
+
+```{r}
+head(df, 5)
+```
+
+```{r}
+library(dplyr)
+
+# group the data by Date
+df <- df %>% 
+  group_by(Date) %>% 
+
+  # compute the mean, sum, and RMS of Positive Sentiment
+  mutate(`Positive Sentiment Averaged` = mean(`Positive Sentiment`),
+         `Positive Sentiment Summed` = sum(`Positive Sentiment`),
+         `Positive Sentiment RMS` = sqrt(mean(`Positive Sentiment`^2))) %>% 
+
+  # compute the mean, sum, and RMS of Negative Sentiment
+  mutate(`Negative Sentiment Averaged` = mean(`Negative Sentiment`),
+         `Negative Sentiment Summed` = sum(`Negative Sentiment`),
+         `Negative Sentiment RMS` = sqrt(mean(`Negative Sentiment`^2))) %>% 
+  
+  # compute the overall sentiment
+  mutate(`Overall Sentiment` = `Positive Sentiment` + `Negative Sentiment`) %>%
+  
+  # compute the mean, sum, and RMS of Overall Sentiment
+  mutate(`Overall Sentiment Averaged` = mean(`Overall Sentiment`),
+         `Overall Sentiment Summed` = sum(`Overall Sentiment`),
+         `Overall Sentiment RMS` = sqrt(mean(`Overall Sentiment`^2))) %>% 
+  
+  # remove the grouping
+  ungroup()
+
+head(df)
+```
+
+```{r}
+df <- df %>% 
+  arrange(Date)
+
+# select rows 25 to 26
+df_subset <- df %>% 
+  slice(25:35)
+
+df_subset
+```
+
+I see the Mistake, there are multiple records for same date, these are duplicate records, we can summarise function to merge them into single one.
+
+```{r}
+library(dplyr)
+
+# group the data by Date and summarize the columns
+df <- df %>% 
+  group_by(Date) %>% 
+
+  summarize(`Positive Sentiment Averaged` = mean(`Positive Sentiment`),
+            `Positive Sentiment Summed` = sum(`Positive Sentiment`),
+            `Positive Sentiment RMS` = sqrt(mean(`Positive Sentiment`^2)),
+            `Negative Sentiment Averaged` = mean(`Negative Sentiment`),
+            `Negative Sentiment Summed` = sum(`Negative Sentiment`),
+            `Negative Sentiment RMS` = sqrt(mean(`Negative Sentiment`^2)),
+            `Overall Sentiment Averaged` = mean(`Positive Sentiment` + `Negative Sentiment`),
+            `Overall Sentiment Summed` = sum(`Positive Sentiment` + `Negative Sentiment`),
+            `Overall Sentiment RMS` = sqrt(mean((`Positive Sentiment` + `Negative Sentiment`)^2))) %>% 
+
+  # remove the grouping
+  ungroup()
+
+# view the first few rows of the modified data frame
+head(df)
+
+```
+
+```{r}
+df <- df %>% 
+  arrange(Date)
+
+# select rows 25 to 26
+df_subset <- df %>% 
+  slice(26)
+
+df_subset
+```
+
+```{r}
+str(df)
+```
+
+### Historical Price Data
+
+```{r}
+library(data.table)
+
+
+df2 <- read.csv("D:/Dpa Project/DPA PROJECT/historical_pricing.csv", header = TRUE)
+names(df2)[1] <- "Date"
+df2 <- df2[-1,]
+df2$Date <- as.Date(df2$Date, format = '%m/%d/%y')
+df2 <- df2[order(df2$Date),]
+df2
+
+```
+```{r}
+# Print the dimensions of the data frame
+cat("shape of data frame: ", dim(df2), "\n")
+cat("*************************************\n")
+# Print the column names
+cat("columns/variables/features in datasets:\n")
+cat(names(df2), "\n")
+cat("*************************************\n")
+
+# Print the numerical columns
+num_cols <- sapply(df2, is.numeric)
+cat("Numerical columns in dataset:\n")
+cat(names(df2[num_cols]), "\n")
+cat("*************************************\n")
+
+# Print the categorical columns
+cat_cols <- sapply(df2, is.factor)
+cat_cols <- cat_cols | sapply(df2, is.character)
+cat("Categorical columns in dataset:\n")
+cat(names(df2[cat_cols]), "\n")
+```
+The price data is actually numerical columns, We have to fix these, we fixed it using change format and rename column names.
+```{r}
+str(df2)
+```
+```{r}
+colSums(is.na(df2))
+
+# #no missing values present 
+```
+This will return a vector with the number of missing values in each column of the data frame. If the result shows all zeros, it means there are no missing values present in the data frame. If there are missing values, the corresponding columns will show non-zero values.
+
+
+```{r}
+# Count duplicate rows in the crypto_df data frame
+sum(duplicated(df2))
+
+#no duplicate values is present in dataset
+```
+
+
+
+```{r}
+
+# Rename the columns
+colnames(df2) <- c("Date", "XRP_Change","XRP_High","XRP_Low", "XRP_Open", "XRP_Price", "XRP_Vol", "BTC_Change", "BTC_High", "BTC_Low", "BTC_Open", "BTC_Price", "BTC_Vol", "ETH_Change", "ETH_High", "ETH_Low", "ETH_Open", "ETH_Price", "ETH_Vol")
+
+head(df2)
+```
+
+```{r}
+library(dplyr)
+# Full Outer Join
+df3 <- merge(df, df2, by.x = "Date",by.y="Date", all.x= TRUE,all.y=TRUE ,sort = TRUE)
+df3 <- df3[-c(1:6),]
+df3 <- df3[-1,]
+df3[,-1] <- lapply(df3[,-1], function(x) ifelse(is.na(x), 0, x))
+```
+
+```{r}
+df3$XRP_Change <- as.numeric(sub("%", "", df3$XRP_Change))
+df3$XRP_High <- as.numeric(sub("%", "",df3$XRP_High))
+df3$XRP_Low <- as.numeric(sub("%", "",df3$XRP_Low ))
+df3$XRP_Open <- as.numeric(sub("%", "",df3$XRP_Open ))
+df3$XRP_Price <- as.numeric(sub("%", "",df3$XRP_Price ))
+
+
+df3$BTC_Change <- as.numeric(sub("%", "", df3$BTC_Change))
+df3$BTC_High <- as.numeric(sub("%", "",df3$BTC_High))
+df3$BTC_Low <- as.numeric(sub("%", "",df3$BTC_Low ))
+df3$BTC_Open <- as.numeric(sub("%", "",df3$BTC_Open ))
+df3$BTC_Price <- as.numeric(sub("%", "",df3$BTC_Price ))
+
+
+
+df3$ETH_Change <- as.numeric(sub("%", "", df3$ETH_Change))
+df3$ETH_High <- as.numeric(sub("%", "",df3$ETH_High))
+df3$ETH_Low <- as.numeric(sub("%", "",df3$ETH_Low ))
+df3$ETH_Open <- as.numeric(sub("%", "",df3$ETH_Open ))
+df3$ETH_Price <- as.numeric(sub("%", "",df3$ETH_Price ))
+
+
+df3$XRP_Vol <- as.numeric(sub("M", "", df3$XRP_Vol))/1000
+df3$BTC_Vol <- as.numeric(sub("K", "", df3$BTC_Vol))
+df3$ETH_Vol <- as.numeric(sub("K", "", df3$ETH_Vol))
+```
+
+```{r}
+convert_thousands <- function(x) {
+  x <- (x * 1000000) / 1000
+  return(x)
+}
+```
+
+```{r}
+df3$XRP_Vol<- df3$XRP_Vol * 1000000 / 1000
+df3$XRP_Change <- c(df3$XRP_Change[-1], 0)
+df3$XRP_Price <- c(df3$XRP_Price[-1], 0)
+```
+
+```{r}
+# view the fixed data frame
+df3
+```
+
+```{r}
+summary(df3)
+```
+
+
+```{r}
+# generate the descriptive statistics with fivenum function
+desc_stats <- apply(df3[,2:9], 2, fivenum)
+desc_stats
+# create a data frame from the statistics
+desc_stats_df<- data.frame(t(desc_stats))
+colnames(desc_stats_df) <- c("Min", "25%", "Median", "75%", "Max")
+desc_stats_df$Mean <- apply(df3[,2:9], 2, mean)
+desc_stats_df$SD <- apply(df3[,2:9], 2, sd)
+desc_stats_df$Count <- apply(df3[,2:9], 2, function(x) sum(!is.na(x)))
+desc_stats1<- data.frame(t(desc_stats_df))
+
+# print the data frame
+desc_stats1
+```
+
+```{r}
+# function to compute statistics including missing values
+my_stats <- function(x) {
+  c(min(x, na.rm=TRUE), quantile(x, probs=c(0.25, 0.5, 0.75), na.rm=TRUE),
+    max(x, na.rm=TRUE), sum(!is.na(x)))
+}
+# compute descriptive statistics
+numeric_cols <- sapply(df3[, 11:(ncol(df3) - 1)], is.numeric)
+desc_statss <- apply(df3[, 11:(ncol(df3) - 1)][, numeric_cols], 2, my_stats)
+
+# create a data frame from the statistics
+desc_stats_df1 <- data.frame(t(desc_statss))
+colnames(desc_stats_df1) <- c("Min", "25%", "Median", "75%", "Max", "Count")
+desc_stats_df1$Mean <- colMeans(df3[, 11:(ncol(df3) - 1)][, numeric_cols], na.rm=TRUE)
+desc_stats_df1$SD <- apply(df3[, 11:(ncol(df3) - 1)][, numeric_cols], 2, sd, na.rm=TRUE)
+desc_stats_df2 <- t(desc_stats_df1)
+
+# print the data frame
+library(tibble)
+as_tibble(desc_stats_df2)
+```
+
+```{r}
+# Remove rows with NA values
+df_clean <- na.omit(desc_stats_df2)
+
+# Create the correlation matrix
+corr_matrix <- cor(df_clean)
+
+# Select the columns
+selected_columns <- corr_matrix[, c("XRP_Change", "XRP_Price")]
+
+# Print the selected columns
+print(selected_columns)
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# Assuming df3 is a data frame in R
+
+# Get the first 9 column names
+y_vars <- colnames(df3)[1:9]
+
+# Create a list to store the individual plots
+plot_list <- list()
+
+# Loop through the y_vars and create a scatter plot for each
+for (i in seq_along(y_vars)) {
+  y_var <- y_vars[i]
+  plot1 <- ggplot(df3, aes(x = XRP_Price, y = .data[[y_var]])) +
+    geom_point() +
+    theme_minimal() +
+    xlab("XRP_Price") +
+    ylab(y_var)
+  plot2 <- ggplot(df3, aes(x = XRP_Change, y = .data[[y_var]])) +
+    geom_point() +
+    theme_minimal() +
+    xlab("XRP_Change") +
+    ylab(y_var)
+  
+  # Combine the plots for XRP_Price and XRP_Change for the current y_var
+  combined_plot <- grid.arrange(plot1, plot2, ncol = 2)
+  
+  # Add the combined plot to the plot list
+  plot_list[[i]] <- combined_plot
+}
+
+# Display the plots in a grid
+do.call("grid.arrange", c(plot_list, ncol = 2))
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# Define the columns to use
+x_vars <- c("XRP_Price", "XRP_Change")
+y_vars <- c("BTC_High", "BTC_Low", "BTC_Price", "ETH_High", "ETH_Low", "ETH_Price")
+
+# Create a list to store the individual plots
+plot_list <- list()
+
+# Loop through the y_vars and create a scatter plot for each
+for (i in seq_along(y_vars)) {
+  y_var <- y_vars[i]
+  plot1 <- ggplot(df3, aes(x = .data[[x_vars[1]]], y = .data[[y_var]])) +
+    geom_point() +
+    theme_minimal() +
+    xlab(x_vars[1]) +
+    ylab(y_var)
+  plot2 <- ggplot(df3, aes(x = .data[[x_vars[2]]], y = .data[[y_var]])) +
+    geom_point() +
+    theme_minimal() +
+    xlab(x_vars[2]) +
+    ylab(y_var)
+  
+  # Combine the plots for the x_vars for the current y_var
+  combined_plot <- grid.arrange(plot1, plot2, ncol = 2)
+  
+  # Add the combined plot to the plot list
+  plot_list[[i]] <- combined_plot
+}
+
+# Display the plots in a grid
+do.call("grid.arrange", c(plot_list, ncol = 2))
+
+```
+
+```{r}
+library(caret)
+scaler <- preProcess(df3[,c('XRP_Price','BTC_Price','ETH_Price')], method = c("center", "scale"))
+scaled_data <- predict(scaler, df3[,c('XRP_Price','BTC_Price','ETH_Price')])
+scaled_data <- as.data.frame(scaled_data)
+colnames(scaled_data) <- c('XRP','BTC','ETH')
+rownames(scaled_data) <- rownames(df3)
+head(scaled_data)
+```
+
+```{r}
+library(ggplot2)
+
+# Scale the data
+scaled_data <- as.data.frame(scale(df3[, c("XRP_Price", "BTC_Price", "ETH_Price")]))
+colnames(scaled_data) <- c("XRP", "BTC", "ETH")
+scaled_data$Date <- df3$Date
+scaled_data <- scaled_data[!is.na(scaled_data$Date), ]
+
+# Plot the data
+ax <- ggplot(scaled_data, aes(x = Date)) +
+  geom_line(aes(y = XRP, colour = "XRP", linetype = "solid"), size = 1) +
+  geom_line(aes(y = BTC, colour = "BTC", linetype = "solid"), size = 1) +
+  geom_line(aes(y = ETH, colour = "ETH", linetype = "solid"), size = 1) +
+  labs(x = "Date", y = "Normalized Price", title = "XRP - BTC - ETH PRICE") +
+  scale_colour_manual(values = c("blue", "green", "red")) +
+  theme_bw()
+
+# Remove axes labels
+ax <- ax + theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+
+# Remove ticks and tick labels
+ax <- ax + theme(axis.text.x = element_blank(), axis.text.y = element_blank())
+ax <- ax + theme(axis.ticks.x = element_blank(), axis.ticks.y = element_blank())
+
+# Display the plot
+print(ax)
+which(is.na(scaled_data))
+```
+
+```{r}
+library(caret)
+scaler <- preProcess(df3[,c('BTC_High','BTC_Low','ETH_High','ETH_Low','XRP_Price')], method = "range")
+data <- predict(scaler, df3[,c('BTC_High','BTC_Low','ETH_High','ETH_Low','XRP_Price')])
+data <- as.data.frame(data, col.names = c('BTC_High','BTC_Low','ETH_High','ETH_Low','XRP_Price'), row.names = rownames(df3))
+```
+
+```{r}
+library(ggplot2)
+
+# plot BTC price with XRP price
+ggplot(df3, aes(x = Date)) +
+  geom_line(aes(y = BTC_High), color = 'green') +
+  geom_line(aes(y = BTC_Low), color = 'red') +
+  geom_line(aes(y = BTC_Price), color = 'black', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = BTC_Low, ymax = BTC_High), fill = 'red', alpha = 0.4) +
+  labs(x = 'Date', y = 'Price', title = 'XRP Price vs BTC HLC') +
+  theme_bw() +
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = 'XRP_Price', breaks = seq(0, 4, 0.5))) +
+  theme(legend.position = 'bottom')
+
+# plot ETH price with XRP price
+ggplot(df3, aes(x = Date)) +
+  geom_line(aes(y = ETH_High), color = 'green') +
+  geom_line(aes(y = ETH_Low), color = 'red') +
+  geom_line(aes(y = ETH_Price), color = 'black', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = ETH_Low, ymax = ETH_High), fill = 'red', alpha = 0.4) +
+  labs(x = 'Date', y = 'Price', title = 'XRP Price vs ETH HLC') +
+  theme_bw() +
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = 'XRP_Price', breaks = seq(0, 4, 0.5))) +
+  theme(legend.position = 'bottom')
+
+```
+
+```{r}
+lm_p <- lm(XRP_Price ~ `Positive Sentiment Summed`, data = df3)
+lm_n <- lm(XRP_Price ~ `Negative Sentiment Summed`, data = df3)
+
+y_p <- predict(lm_p)
+y_n <- predict(lm_n)
+```
+
+```{r}
+library(ggplot2)
+
+
+ggplot(df3, aes(x = `Negative Sentiment RMS`, y = XRP_Price)) +
+  geom_point(aes(color = "Negative Sentiment"), alpha = 0.4, shape = 20) +
+  geom_point(aes(x = `Positive Sentiment RMS`, y = XRP_Price, color = "Positive Sentiment"), alpha = 0.4, shape = 20) +
+  scale_color_manual(values = c("Negative Sentiment" = "red", "Positive Sentiment" = "green")) +
+  labs(x = "Negaitve - Positve Sentiment RMS", y = "XRP Price", title = "Sentiment Analysis vs. XRP Price") +
+  stat_ellipse(aes(x0 = -0.3, y0 = 1.5, a = 0.2, b = 2.8, angle = 348), type = "norm", level = 0.95, geom = "polygon", color = "gray", fill = "gray", alpha = 0.2, linetype = 0, size = 2) +
+  stat_ellipse(aes(x0 = 0.3, y0 = 1.9, a = 0.2, b = 2.7, angle = 349), type = "norm", level = 0.95, geom = "polygon", color = "gray", fill = "gray", alpha = 0.2, linetype = 0, size = 2) +
+  theme_minimal()
+
+ggplot(df3, aes(x = `Negative Sentiment Summed`, y = XRP_Price)) +
+  geom_point(aes(color = "Negative Sentiment"), alpha = 0.4, shape = 20) +
+  geom_point(aes(x = `Positive Sentiment Summed`, y = XRP_Price, color = "Positive Sentiment"), alpha = 0.4, shape = 20) +
+  scale_color_manual(values = c("Negative Sentiment" = "red", "Positive Sentiment" = "green")) +
+  labs(x = "Negative - Positive Sentiment Summed", y = "XRP Price", title = "Sentiment Analysis vs. XRP Price") +
+  stat_smooth(aes(x = `Positive Sentiment Summed`, y = XRP_Price), method = "lm", color = "green") +
+  stat_smooth(aes(x = `Negative Sentiment Summed`, y = XRP_Price), method = "lm", color = "red") +
+  theme_minimal()
+
+
+```
+
+```{r}
+
+library(ggplot2)
+library(gridExtra)
+
+# create the first plot
+p1 <- ggplot(df3, aes(x = Date)) + 
+  geom_line(aes(y = XRP_Price, colour = "Price"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = XRP_Price, fill = "Price"), alpha = 0.4) +
+  geom_line(aes(y = `Positive Sentiment RMS`, colour = "Positive Sentiment RMS"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Positive Sentiment RMS`, fill = "Positive Sentiment RMS"), alpha = 0.4) +
+  geom_line(aes(y = `Negative Sentiment RMS`, colour = "Negative Sentiment RMS"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Negative Sentiment RMS`, fill = "Negative Sentiment RMS"), alpha = 0.4) +
+  scale_fill_manual(values = c("Price" = "blue", "Positive Sentiment RMS" = "green", "Negative Sentiment RMS" = "red")) +
+  scale_color_manual(values = c("Price" = "black", "Positive Sentiment RMS" = "black", "Negative Sentiment RMS" = "black")) +
+  labs(x = "", y = "Price / Sentiment RMS", color = "", fill = "") +
+  ggtitle("Price with Sentiment RMS") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18, face = "bold"),
+        legend.position = "bottom",
+        legend.key.size = unit(0.8, "cm"),
+        legend.text = element_text(size = 14),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+# create the second plot
+p2 <- ggplot(df3, aes(x = Date)) + 
+  geom_line(aes(y = XRP_Price, colour = "Price"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = XRP_Price, fill = "Price"), alpha = 0.4) +
+  geom_line(aes(y = `Positive Sentiment Summed`, colour = "Positive Sentiment Summed"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Positive Sentiment Summed`, fill = "Positive Sentiment Summed"), alpha = 0.4) +
+  geom_line(aes(y = `Negative Sentiment Summed`, colour = "Negative Sentiment Summed"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Negative Sentiment Summed`, fill = "Negative Sentiment Summed"), alpha = 0.4) +
+  scale_fill_manual(values = c("Price" = "blue", "Positive Sentiment Summed" = "green", "Negative Sentiment Summed" = "red")) +
+  scale_color_manual(values = c("Price" = "black", "Positive Sentiment Summed" = "black", "Negative Sentiment Summed" = "black")) +
+  labs(x = "", y = "Price / Sentiment Summed", color = "", fill = "") +
+  ggtitle("Price with Sentiment Summed") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18, face = "bold"),
+        legend.position = "bottom",
+        legend.key.size = unit(0.8, "cm"),
+        legend.text = element_text(size = 14),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+grid.arrange(p1, ncol = 1, heights = c(2, 1))
+ grid.arrange(p2, ncol = 1, heights = c(2, 1))
+ 
+```
+
+Again, we can see that Sentiment RMS doesn't translate very well to a change in XRP price like Sentiment Summed does. At XRP's highest Price point, Sentiment RMS has a value no higher than when XRP's price point was close to it's lowest. Sentiment Summed however, does reflect a huge leap in XRP Price at the same instance Sentiment explodes as well. However take note that these sentiments are purely day to day sentiments. But when an investor is investing, they wouldn't only look at articles on the day they were investing. They would research days, and sometimes weeks prior to determine sentiment and performance. Therefore, a days sentiment should also reflect previous days' sentiment as well. This will not only help smooth out the sentiment curve, but take into account for all 0 values of sentiment that the sentiment might not actually be 0. A value of 0 can simply mean that no article was written on that day, so Sentiment from a previous day would simply roll into that day. If There had been extremely high sentiment for the past week, but today there were no articles written on XRP, that doesn't mean that Sentiment on the coin has dropped within the market, it just simply means that no article was written today on the coin. We must account for this. It's not unreasonable to speculate that an investor might look at a coins weekly performance when determining strategy. Therefore, let's perform a 5 day rolling average for sentiment. When averaging the values however, yesterday's value being averaged into today will be it's original value, not it's rolling average value from when the 5 day average was performed on it. For example if we were performing a 3 day rolling average:
+
+Day 20 - Original Value: 2 \| 3-Day Average: 2.7
+
+Day 21 - Original Value: 1 \| 3-Day Average: 2.5
+
+Day 23 - Original Value: 4 \| 3-Day Average: 3.5
+
+Notice from day 3, it got it's 3 day average from the original values of the previous 2 days, not their 3 Day Average
+
+```{r}
+boxfilter <- function(df, col) {
+  # create copies so as to not overwrite original dataframe
+  c <- df[[col]]
+  d <- c
+  # overwrite values in d with rolling averages of the last 5 values in c
+  for (i in 5:length(c)) {
+    d[i] <- mean(c((c[(i-4):i])))
+  }
+  # create new column to write to dataframe
+  column <- paste0(strsplit(col, ' ')[[1]][length(strsplit(col, ' ')[[1]])], '_box_filter')
+  # set column equal to averaged sentiments within the dataframe
+  df[column] <- d
+  # return original dataframe with new column
+  return(df)
+}
+
+
+```
+
+```{r}
+df4 <- df3
+df4 = boxfilter(df4, 'Overall Sentiment RMS')
+df4 = boxfilter(df4, 'Overall Sentiment Summed')
+df4 = boxfilter(df4, 'Overall Sentiment Averaged')
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# create the first plot
+p1 <- ggplot(df3, aes(x = Date)) + 
+  geom_line(aes(y = XRP_Price, colour = "Price"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = XRP_Price, fill = "Price"), alpha = 0.4) +
+  geom_line(aes(y = `Positive Sentiment RMS`, colour = "Positive Sentiment RMS"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Positive Sentiment RMS`, fill = "Positive Sentiment RMS"), alpha = 0.4) +
+  geom_line(aes(y = `Negative Sentiment RMS`, colour = "Negative Sentiment RMS"), size = 0.5) +
+  geom_ribbon(aes(ymin = 0, ymax = `Negative Sentiment RMS`, fill = "Negative Sentiment RMS"), alpha = 0.4) +
+  scale_fill_manual(values = c("Price" = "blue", "Positive Sentiment RMS" = "green", "Negative Sentiment RMS" = "red")) +
+  scale_color_manual(values = c("Price" = "black", "Positive Sentiment RMS" = "black", "Negative Sentiment RMS" = "black")) +
+  labs(x = "", y = "Price / Sentiment RMS", color = "", fill = "") +
+  ggtitle("Price with Sentiment RMS") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18, face = "bold"),
+        legend.position = "bottom",
+        legend.key.size = unit(0.8, "cm"),
+        legend.text = element_text(size = 14),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+grid.arrange(p1, ncol = 1, heights = c(2, 1))
+
+# create the second plot
+par(mfrow = c(2,1), mar = c(4, 4, 2, 1), oma = c(0, 0, 2, 0))
+plot(df4$XRP_Price, type = "l", col = "black", lwd = 0.5, xaxt = "n", xlab = "", ylab = "Price / RMS Sentiment")
+polygon(c(1:length(df4$XRP_Price), length(df4$XRP_Price):1), c(rep(0, length(df4$XRP_Price)), rev(df4$XRP_Price)), col = "blue", border = NA, alpha = 0.4)
+lines(df4$Summed_box_filter, col = "black", lwd = 0.5)
+polygon(c(1:length(df4$Summed_box_filter), length(df4$Summed_box_filter):1), c(rep(0, length(df4$Summed_box_filter)), rev(df4$Summed_box_filter)), col = ifelse(df4$Summed_box_filter >= 0, "green", "red"), border = NA, alpha = 0.4)
+title("Filtered RMS Sentiment with Price")
+mtext("Price / RMS Sentiment", side = 2, line = 2, cex = 0.8)
+axis(1, at = seq(1, nrow(df4), by = 30), labels = format(as.Date(df4$index)[seq(1, nrow(df4), by = 30)], "%b %d"))
+
+```
+
+```{r}
+# Check for non-numeric values and convert to numeric
+df4[] <- lapply(df4, as.numeric)
+
+# Remove rows with missing data
+df4_complete <- df4[complete.cases(df4),]
+
+# Convert df4_complete to a numeric matrix
+df4_numeric <- as.matrix(df4_complete)
+
+# Compute the correlation matrix
+corr <- cor(df4_numeric)
+
+# Extract the correlation coefficient between "XRP_Price" and "Summed_box_filter"
+corr_coef <- corr[["XRP_Price", "Summed_box_filter"]]
+corr_coef 
+```
+
+```{r}
+# Assuming 'df4' is already available as a data frame in R
+
+# Load required packages
+library(ggplot2)
+library(dplyr)
+
+# Create a new column 'colors' based on the 'XRP_Vol' column values
+df4 <- df4 %>%
+  mutate(colors = ifelse(lag(XRP_Vol, default = first(XRP_Vol)) < XRP_Vol, "g", "r"))
+
+# Create the main plot
+main_plot <- ggplot(df4, aes(x = Date)) +
+  geom_line(aes(y = XRP_Price), color = "black", size = 0.5) +
+  geom_area(aes(y = XRP_Price), fill = "blue", alpha = 0.4) +
+  geom_line(aes(y = Summed_box_filter), color = "black", size = 0.5) +
+  geom_area(aes(y = ifelse(Summed_box_filter >= 0, Summed_box_filter, 0)), fill = "green") +
+  geom_area(aes(y = ifelse(Summed_box_filter <= 0, Summed_box_filter, 0)), fill = "red") +
+  theme_void() +
+  theme(plot.margin = margin(0, 0, 0, 0))
+
+# Create the volume bar plot
+volume_plot <- ggplot(df4, aes(x = Date, y = XRP_Vol, fill = colors)) +
+  geom_col() +
+  scale_fill_manual(values = c("g" = "green", "r" = "red")) +
+  theme_void() +
+  theme(plot.margin = margin(0, 0, 0, 0))
+
+# Combine the main plot and volume bar plot using cowplot
+library(cowplot)
+combined_plot <- plot_grid(main_plot, volume_plot, nrow = 2, rel_heights = c(3, 1))
+
+# Display the combined plot
+print(combined_plot)
+
+
+
+```
+
+```{r}
+rolling_average <- function(df) {
+  a <- df
+  c <- a$XRP_Price
+  five <- a$XRP_Change
+  five[1] <- 0
+  ten <- five
+  fifteen <- five
+  twenty <- five
+  thirty <- five
+  
+  for (i in 2:length(five)) {
+    if (i < 5) {
+      five[i] <- (c[i] - c[1]) / c[1]
+    } else {
+      five[i] <- (c[i] - c[i-4]) / c[i-4]
+    }
+  }
+  
+  for (i in 2:length(ten)) {
+    if (i < 10) {
+      ten[i] <- (c[i] - c[1]) / c[1]
+    } else {
+      ten[i] <- (c[i] - c[i-9]) / c[i-9]
+    }
+  }
+  
+  for (i in 2:length(fifteen)) {
+    if (i < 15) {
+      fifteen[i] <- (c[i] - c[1]) / c[1]
+    } else {
+      fifteen[i] <- (c[i] - c[i-14]) / c[i-14]
+    }
+  }
+  
+  for (i in 2:length(twenty)) {
+    if (i < 20) {
+      twenty[i] <- (c[i] - c[1]) / c[1]
+    } else {
+      twenty[i] <- (c[i] - c[i-19]) / c[i-19]
+    }
+  }
+  
+  for (i in 2:length(thirty)) {
+    if (i < 30) {
+      thirty[i] <- (c[i] - c[1]) / c[1]
+    } else {
+      thirty[i] <- (c[i] - c[i-29]) / c[i-29]
+    }
+  }
+  
+  data <- data.frame('five day percent change' = five, 'ten day percent change' = ten , 'fifteen day percent change' = fifteen, 'twenty day percent change' = twenty, 'thirty day percent change' = thirty, 'price' = a$XRP_Price)
+  
+  return(data)
+}
+
+
+
+```
+
+```{r}
+data <- rolling_average(df4)
+head(data, 30)
+```
+
+```{r}
+library(ggplot2)
+# Assuming your data frame is named "data"
+
+# Set the index as a separate column
+data$index <- seq_along(data$price)
+
+# Create a function to generate the plots
+generate_plot <- function(col_name) {
+  ggplot(data, aes(x = index)) +
+    geom_line(aes(y = price), color = "black") +
+    geom_area(aes(y = price), fill = "blue", alpha = 0.4) +
+    geom_line(aes(y = data[[col_name]]), color = "black") +
+    geom_area(aes(y = pmax(data[[col_name]], 0)), fill = "green", alpha = 0.4) +
+    geom_area(aes(y = pmin(data[[col_name]], 0)), fill = "red", alpha = 0.4) +
+    labs(title = col_name, y = "Price / Price Percent Change") +
+    theme_minimal()
+}
+
+# Generate the plots
+idx <- c("five.day.percent.change", "ten.day.percent.change", "fifteen.day.percent.change",
+         "twenty.day.percent.change", "thirty.day.percent.change")
+
+for (i in idx) {
+  print(generate_plot(i))
+}
+
+
+```
+
+```{r}
+
+library(ggplot2)
+library(ggcorrplot)
+
+# Remove rows and columns with missing values
+data_complete <- na.omit(data)
+
+# Compute the correlation matrix
+cor_matrix <- cor(data_complete)
+
+# Create the correlation heatmap with correlation coefficients
+ggcorrplot(cor_matrix, hc.order = TRUE, type = "lower", 
+           lab = TRUE, lab_size = 3,
+           colors = c("green", "white", "pink"),
+           title = "Correlation Heatmap",
+           ggtheme = ggplot2::theme_minimal())
+
+```
+
+```{r}
+
+library(tidyr)
+
+library(dplyr)
+
+# Assuming 'data' and 'df3' are already available as data frames in R
+
+a <- data %>% 
+  mutate(row_index = row_number()) %>% 
+  select(row_index, "ten.day.percent.change", "thirty.day.percent.change")
+
+b <- df3 %>% 
+  mutate(row_index = row_number()) %>% 
+  full_join(a, by = "row_index")
+
+# Select only numeric columns
+b_numeric <- b %>% select_if(is.numeric)
+
+corr <- cor(b_numeric, use = "complete.obs", method = "pearson")
+filtered_corr <- corr[corr["ten.day.percent.change", ] > 0.3 | corr["thirty.day.percent.change", ] > 0.3, ]
+filtered_corr <- filtered_corr %>% as_tibble(rownames = "variable") %>%
+  filter(variable == "ten.day.percent.change" | variable == "thirty.day.percent.change") %>%
+  drop_na()
+
+filtered_corr
+
+```
+
+```{r}
+library(dplyr)
+
+filtered_corr <- corr[corr["XRP_Price", ] > 0.3, c("XRP_Price", "thirty.day.percent.change")]
+
+filtered_corr
+
+```
+
+```{r}
+library(dplyr)
+
+# Assuming 'b' is already available as a data frame in R
+
+bins_result <- cut(b$XRP_Price, breaks = 50, labels = FALSE, include.lowest = TRUE)
+bins <- attr(bins_result, "breaks")
+
+# Print bins
+cat("Bins:", "\n")
+print(bins)
+
+# Add the bins_result as a new column to the data frame
+b_with_bins <- b %>% mutate(XRP_Price_Bins = bins_result)
+
+# Print the first 30 elements of the binned data
+cat("Binned Data:", "\n")
+print(head(b_with_bins[, c("Date", "XRP_Price_Bins")], 30))
+
+```
+
+```{r}
+# Load the required libraries
+library(ggplot2)
+library(dplyr)
+
+# Assuming 'b_with_bins' is already available as a data frame in R
+
+# Create the ggplot object with the binned price (XRP_Price_Bins) and the Date
+p <- ggplot(b_with_bins, aes(x = Date)) +
+  geom_line(aes(y = XRP_Price_Bins), color = "blue", size = 1.5) +
+  labs(y = "Bin Number", title = "Binned Price Ranges") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Add the XRP_Price on a secondary axis
+p <- p + geom_line(aes(y = XRP_Price * 10), color = "red", linetype = "dashed", size = 1) +
+  scale_y_continuous(sec.axis = sec_axis(~./10, name = "XRP Price"))
+
+# Display the plot
+print(p)
+
+```
+
+```{r}
+# Assuming 'b_with_bins' is already available as a data frame in R
+
+# Create a new column 'binned_price' with the integer values of 'bins_result'
+b_with_bins$binned_price <- as.integer(bins_result)
+
+# Select only numeric columns
+numeric_columns <- sapply(b_with_bins, is.numeric)
+b_with_bins_numeric <- b_with_bins[, numeric_columns]
+
+# Calculate the correlation
+corr_matrix <- cor(b_with_bins_numeric, use = "complete.obs", method = "pearson")
+
+# Filter the correlation matrix for values greater than 0.3
+filtered_corr <- corr_matrix
+filtered_corr[filtered_corr <= 0.3] <- NA
+
+# Subset the correlation matrix to only include 'binned_price' and 'XRP_Price' columns
+filtered_corr <- subset(filtered_corr, select = c("binned_price", "XRP_Price"))
+
+# Drop rows with all NA values
+filtered_corr <- filtered_corr[!apply(is.na(filtered_corr), 1, all),]
+
+# Display the filtered correlation matrix
+print(filtered_corr)
+
+
+```
+
+```{r}
+# Assuming 'b' is already available as a data frame in R
+
+# Save the DataFrame 'b' to a CSV file
+write.csv(b, file = "XRP_Data.csv", row.names = FALSE)
+
+```
+
+
+
+
+

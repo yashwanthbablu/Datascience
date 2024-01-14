@@ -1,0 +1,1731 @@
+---
+title: "DPA_Model"
+output: html_document
+date: "2023-04-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## LOAD DATA
+
+```{r}
+library(tidyverse)
+
+df <- read_csv("D:/Dpa Project/DPA PROJECT/XRP_Data.csv") %>%
+  mutate(XRP_Change = lag(XRP_Change),
+         XRP_Price = lag(XRP_Price)) %>%
+  slice(-1) %>%
+  add_row(XRP_Change = 9.57, XRP_Price = 0.1786, .before = 1)
+
+print(dim(df))
+head(df)
+
+```
+
+
+
+```{r}
+str(df)
+```
+
+
+
+```{r}
+library(dplyr)
+
+# select columns related to XRP and sentiment data
+xrp_sentiments <- select(df, starts_with("Positive"), starts_with("Negative"), starts_with("Overall"), 
+                         XRP_Change, XRP_High, XRP_Low, XRP_Open, XRP_Price, XRP_Vol)
+
+# select columns related to BTC and sentiment data
+btc_sentiments <- select(df, starts_with("Positive"), starts_with("Negative"), starts_with("Overall"), 
+                         BTC_Change, BTC_High, BTC_Low, BTC_Open, BTC_Price, BTC_Vol)
+
+# select columns related to ETH and sentiment data
+eth_sentiments <- select(df, starts_with("Positive"), starts_with("Negative"), starts_with("Overall"), 
+                         ETH_Change, ETH_High, ETH_Low, ETH_Open, ETH_Price, ETH_Vol)
+
+head(xrp_sentiments)
+
+```
+
+```{r}
+head(btc_sentiments)
+```
+
+```{r}
+head(eth_sentiments)
+```
+
+
+```{r}
+##Is there NA values
+colSums(is.na(xrp_sentiments))
+colSums(is.na(btc_sentiments))
+colSums(is.na(eth_sentiments))
+
+```
+```{r}
+xrp_sentiments <- na.omit(xrp_sentiments)
+btc_sentiments <- na.omit(btc_sentiments)
+eth_sentiments <- na.omit(eth_sentiments)
+```
+
+```{r}
+str(xrp_sentiments)
+```
+```{r}
+str(btc_sentiments)
+```
+```{r}
+str(eth_sentiments)
+```
+## CORRELATION PLOTS 
+```{r}
+## ETHERIUM CORRELATION PLOT
+library(corrplot)
+
+# Set plot size
+par(mar = c(1, 1, 1, 1), cex = 0.6)
+
+# Calculate correlation matrix
+cor_matrix_eth <- cor(eth_sentiments)
+
+# Round off values to 3 decimal places
+cor_matrix_rounded <- round(cor_matrix_eth, 3)
+# Print correlation matrix
+print(cor_matrix_rounded)
+
+# Plot correlation matrix
+corrplot(cor_matrix_eth, method = "color",addCoef.col = "black", number.cex = 0.7,width = 10, height = 10)
+
+```
+
+
+```{r}
+## BITCOIN CORRELATION PLOT
+library(corrplot)
+
+# Set plot size
+par(mar = c(1, 1, 1, 1), cex = 0.6)
+
+# Calculate correlation matrix
+cor_matrix_btc <- cor(btc_sentiments)
+
+# Round off values to 3 decimal places
+cor_matrix_rounded <- round(cor_matrix_btc, 3)
+# Print correlation matrix
+print(cor_matrix_rounded)
+
+# Plot correlation matrix
+corrplot(cor_matrix_btc, method = "color",addCoef.col = "black", number.cex = 0.7,width = 10, height = 10)
+
+```
+
+```{r}
+## XRP CORRELATION PLOT
+library(corrplot)
+
+# Set plot size
+par(mar = c(1, 1, 1, 1), cex = 0.6)
+
+# Calculate correlation matrix
+cor_matrix_xrp <- cor(xrp_sentiments)
+
+# Round off values to 3 decimal places
+cor_matrix_rounded <- round(cor_matrix_xrp, 3)
+# Print correlation matrix
+print(cor_matrix_rounded)
+
+# Plot correlation matrix
+corrplot(cor_matrix_xrp, method = "color",addCoef.col = "black", number.cex = 0.7,width = 10, height = 10)
+
+```
+## MODEL IMPLEMENTATION FOR 3 CRYPTOCURRENCIES
+1. ETH - Random Forest (all cols)
+2. ETH - Multiple Regression (all cols)
+3. ETH - Lasso regression (all cols)
+
+1. BTC - Random Forest (all cols)
+2. BTC - Multiple Regression (all cols)
+3. BTC - Lasso regression (all cols)
+
+1. XRP - Random Forest (all cols)
+2. XRP - Multiple Regression (all cols)
+3. XRP - Lasso regression (all cols)
+
+## 1- model 
+
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+library(randomForest)
+
+# Load data
+data <- eth_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = ETH_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build random forest regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$ETH_Change
+
+rf_model <- randomForest(x = x_train, y = y_train, ntree = 500, importance = TRUE)
+
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$ETH_Change
+
+predictions <- predict(rf_model, newdata = x_test)
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("MAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+
+
+```
+
+Random forest regression does not have a summary or coefficients like linear regression. Instead, random forest models are made up of many individual decision trees, so it is more common to inspect their performance metrics and feature importance.
+```{r}
+# Extract feature importance from random forest model
+importance <- importance(rf_model)
+varImpPlot(rf_model, main = "Variable Importance")
+
+# View performance metrics
+cat("Out-of-bag error:", rf_model$err.rate[500,1], "\n")
+
+# View variable importance
+cat("Feature importance:\n")
+print(importance)
+
+
+train_data_df <- as.data.frame(train_data)
+train_data_mat <- as.matrix(train_data[,1:14])
+
+# Plot partial dependence for Positive Sentiment Averaged
+partialPlot(rf_model, train_data_df, "Positive Sentiment Averaged")
+partialPlot(rf_model, train_data_mat, "Positive Sentiment Averaged")
+
+
+
+
+```
+
+## 2- model  
+```{r}
+library(tidyverse)
+library(glmnet)
+
+# Load the data
+data <- eth_sentiments
+
+# Split the data into training and test sets
+set.seed(123)
+train_index <- sample(nrow(data), 0.7*nrow(data))
+train <- data[train_index, ]
+test <- data[-train_index, ]
+
+# Fit the Lasso regression model using cross-validation
+x <- model.matrix(ETH_Change ~ ., data = train)[,-1]
+y <- train$ETH_Change
+lasso_fit <- cv.glmnet(x, y, alpha = 1, standardize = TRUE)
+
+plot(lasso_fit)
+# Determine the optimal value of lambda and extract the coefficients
+best_lambda <- lasso_fit$lambda.min
+lasso_coef <- coef(lasso_fit, s = best_lambda)
+
+# Make predictions on the test set and calculate MSE
+pred <- predict(lasso_fit, newx = model.matrix(ETH_Change ~ ., data = test)[,-1], s = best_lambda)
+mse <- mean((test$ETH_Change - pred)^2)
+rmse <- sqrt(mse)
+mae <- mean(abs(test$ETH_Change - pred))
+
+# Print the coefficients
+print(lasso_coef)
+
+# Print the cross-validated mean squared error (CV-MSE), RMSE, and MAE
+cv_mse <- lasso_fit$cvm[lasso_fit$lambda == best_lambda]
+cv_rmse <- sqrt(cv_mse)
+cv_mae <- mean(abs(lasso_fit$fit[,lasso_fit$lambda == best_lambda] - y))
+print(paste0("CV-MSE = ", round(cv_mse, 2)))
+print(paste0("CV-RMSE = ", round(cv_rmse, 2)))
+print(paste0("CV-MAE = ", round(cv_mae, 2)))
+
+# Print the mean squared error (MSE), RMSE, and MAE on the test set
+print(paste0("MSE = ", round(mse, 2)))
+print(paste0("RMSE = ", round(rmse, 2)))
+print(paste0("MAE = ", round(mae, 2)))
+
+
+```
+
+```{r}
+# Plot the predicted versus actual values
+ggplot(data = test, aes(x = ETH_Change, y = pred)) + geom_point() + geom_abline() + ggtitle(paste0("MSE = ", round(mse, 2)))
+
+
+```
+```{r}
+# Fit a linear regression model for comparison
+lm_fit <- lm(ETH_Change ~ ., data = train)
+
+# Make predictions on the test set using both models
+lasso_pred <- predict(lasso_fit, newx = model.matrix(ETH_Change ~ ., data = test)[,-1], s = best_lambda)
+lm_pred <- predict(lm_fit, newdata = test)
+
+# Plot the residuals vs. fitted values for both models
+plot(lm_pred, test$ETH_Change - lm_pred, col = "blue", pch = 16, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values")
+points(lasso_pred, test$ETH_Change - lasso_pred, col = "red", pch = 16)
+legend("topright", c("Linear Regression", "Lasso Regression"), col = c("blue", "red"), pch = 16)
+
+```
+## 3- model 
+
+ETH - Multiple Linear regression (Specific cols)
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+
+# Load data
+data <- eth_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = ETH_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build multiple linear regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$ETH_Change
+
+mlr_model2 <- lm(y_train ~ ., data = cbind(x_train, y_train))
+summary(mlr_model2)
+```
+
+```{r}
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$XRP_Change
+
+predictions <- predict(mlr_model2, newdata = cbind(x_test, y_test))
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("\nMAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+```
+
+```{r}
+library(ggplot2)
+
+# Residuals vs Fitted values plot
+residuals <- residuals(mlr_model2)
+fitted_values <- fitted(mlr_model2)
+
+residuals_vs_fitted <- data.frame(Residuals = residuals, FittedValues = fitted_values)
+
+ggplot(residuals_vs_fitted, aes(x = FittedValues, y = Residuals)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# Q-Q plot
+qqnorm(residuals, main = "Normal Q-Q Plot")
+qqline(residuals)
+```
+
+
+Based on the metrics provided, we can make the following comparisons between the models:
+
+- Random forest has the lowest MAE and RMSE values, indicating better performance in terms of predicting the outcome variable.
+- Linear regression has the highest R2 value, indicating the highest proportion of variance in the outcome variable that is explained by the predictor variables.
+- Lasso regression has a higher RMSE and MAE than random forest, indicating poorer performance in predicting the outcome variable. However, - Lasso regression does feature a lower number of predictor variables compared to random forest and may be preferred if feature selection is a priority.
+- Overall, it seems that the random forest model performs the best for predicting the ETH_Change variable. However, the choice of which model to use ultimately depends on the specific goals and requirements of the analysis.
+
+---------------------------------------------------------------------------------------------------------
+
+XRP Model 
+
+## 1- model
+
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+library(randomForest)
+
+# Load data
+data <- xrp_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = XRP_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build random forest regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$XRP_Change
+
+rf_model <- randomForest(x = x_train, y = y_train, ntree = 500, importance = TRUE)
+
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$XRP_Change
+
+predictions <- predict(rf_model, newdata = x_test)
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("MAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+
+
+```
+
+```{r}
+# Extract feature importance from random forest model
+importance <- importance(rf_model)
+varImpPlot(rf_model, main = "Variable Importance")
+
+# View performance metrics
+cat("Out-of-bag error:", rf_model$err.rate[500,1], "\n")
+
+# View variable importance
+cat("Feature importance:\n")
+print(importance)
+
+train_data_df <- as.data.frame(train_data)
+train_data_mat <- as.matrix(train_data[,1:14])
+
+# Plot partial dependence for Positive Sentiment Averaged
+partialPlot(rf_model, train_data_df, "Positive Sentiment Averaged")
+partialPlot(rf_model, train_data_mat, "Positive Sentiment Averaged")
+
+```
+## 2 Model
+XRP - Multiple Linear regression (Specific cols)
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+
+# Load data
+data <- xrp_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = XRP_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build multiple linear regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$XRP_Change
+
+mlr_model <- lm(y_train ~ ., data = cbind(x_train, y_train))
+summary(mlr_model)
+```
+
+
+```{r}
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$ETH_Change
+
+predictions <- predict(mlr_model, newdata = cbind(x_test, y_test))
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("\nMAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+```
+
+```{r}
+library(ggplot2)
+
+# Residuals vs Fitted values plot
+residuals <- residuals(mlr_model)
+fitted_values <- fitted(mlr_model)
+
+residuals_vs_fitted <- data.frame(Residuals = residuals, FittedValues = fitted_values)
+
+ggplot(residuals_vs_fitted, aes(x = FittedValues, y = Residuals)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# Q-Q plot
+qqnorm(residuals, main = "Normal Q-Q Plot")
+qqline(residuals)
+```
+
+
+
+## 3 - mdoel
+```{r}
+library(tidyverse)
+library(glmnet)
+
+# Load the data
+data <- xrp_sentiments
+
+# Split the data into training and test sets
+set.seed(123)
+train_index <- sample(nrow(data), 0.7*nrow(data))
+train <- data[train_index, ]
+test <- data[-train_index, ]
+
+# Fit the Lasso regression model using cross-validation
+x <- model.matrix(XRP_Change ~ ., data = train)[,-1]
+y <- train$XRP_Change
+lasso_fit <- cv.glmnet(x, y, alpha = 1, standardize = TRUE)
+plot(lasso_fit)
+
+# Determine the optimal value of lambda and extract the coefficients
+best_lambda <- lasso_fit$lambda.min
+lasso_coef <- coef(lasso_fit, s = best_lambda)
+
+# Make predictions on the test set and calculate MSE
+pred <- predict(lasso_fit, newx = model.matrix(XRP_Change ~ ., data = test)[,-1], s = best_lambda)
+mse <- mean((test$XRP_Change - pred)^2)
+rmse <- sqrt(mse)
+mae <- mean(abs(test$XRP_Change - pred))
+
+# Print the coefficients
+print(lasso_coef)
+
+# Print the cross-validated mean squared error (CV-MSE), RMSE, and MAE
+cv_mse <- lasso_fit$cvm[lasso_fit$lambda == best_lambda]
+cv_rmse <- sqrt(cv_mse)
+cv_mae <- mean(abs(lasso_fit$fit[,lasso_fit$lambda == best_lambda] - y))
+print(paste0("CV-MSE = ", round(cv_mse, 2)))
+print(paste0("CV-RMSE = ", round(cv_rmse, 2)))
+print(paste0("CV-MAE = ", round(cv_mae, 2)))
+
+# Print the mean squared error (MSE), RMSE, and MAE on the test set
+print(paste0("MSE = ", round(mse, 2)))
+print(paste0("RMSE = ", round(rmse, 2)))
+print(paste0("MAE = ", round(mae, 2)))
+
+
+```
+```{r}
+# Plot the predicted versus actual values
+ggplot(data = test, aes(x = XRP_Change, y = pred)) + geom_point() + geom_abline() + ggtitle(paste0("MSE = ", round(mse, 2)))
+
+```
+
+```{r}
+# Fit a linear regression model for comparison
+lm_fit <- lm(XRP_Change ~ ., data = train)
+
+# Make predictions on the test set using both models
+lasso_pred <- predict(lasso_fit, newx = model.matrix(XRP_Change ~ ., data = test)[,-1], s = best_lambda)
+lm_pred <- predict(lm_fit, newdata = test)
+
+# Plot the residuals vs. fitted values for both models
+plot(lm_pred, test$XRP_Change - lm_pred, col = "blue", pch = 16, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values")
+points(lasso_pred, test$XRP_Change - lasso_pred, col = "red", pch = 16)
+legend("topright", c("Linear Regression", "Lasso Regression"), col = c("blue", "red"), pch = 16)
+
+```
+Based on the metrics provided, we can make the following comparisons between the models for predicting XRP_Change:
+
+- Linear regression has the highest R2 value, indicating the highest proportion of variance in the outcome variable that is explained by the predictor variables.
+- Lasso regression has a lower RMSE and MAE than random forest, indicating better performance in terms of predicting the outcome variable. - - However, Lasso regression does feature a lower number of predictor variables compared to random forest and may be preferred if feature selection is a priority.
+- Random forest has the highest MAE and RMSE values, indicating poorer performance in terms of predicting the outcome variable compared to the other models.
+- Overall, it seems that the Lasso regression model performs the best for predicting the XRP_Change variable. However, the choice of which model to use ultimately depends on the specific goals and requirements of the analysis.
+
+
+
+------------------------------------------------------------------------------------------------------------------------------
+
+## BTC 
+## 1- model 
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+library(randomForest)
+
+# Load data
+data <- btc_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = BTC_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build random forest regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$BTC_Change
+
+rf_model <- randomForest(x = x_train, y = y_train, ntree = 500, importance = TRUE)
+
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$BTC_Change
+
+predictions <- predict(rf_model, newdata = x_test)
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("MAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+
+
+```
+
+```{r}
+# Extract feature importance from random forest model
+importance <- importance(rf_model)
+varImpPlot(rf_model, main = "Variable Importance")
+
+# View performance metrics
+cat("Out-of-bag error:", rf_model$err.rate[500,1], "\n")
+
+# View variable importance
+cat("Feature importance:\n")
+print(importance)
+
+train_data_df <- as.data.frame(train_data)
+train_data_mat <- as.matrix(train_data[,1:14])
+
+# Plot partial dependence for Positive Sentiment Averaged
+partialPlot(rf_model, train_data_df, "Positive Sentiment Averaged")
+partialPlot(rf_model, train_data_mat, "Positive Sentiment Averaged")
+
+```
+## 2 Model
+BTC - Multiple Linear regression (Specific cols)
+```{r}
+library(tidyverse)
+library(caret)
+library(rsample)
+
+# Load data
+data <- btc_sentiments
+
+# Split data into training and test sets
+set.seed(123)
+data_split <- initial_split(data, prop = 0.7, strata = BTC_Change)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Build multiple linear regression model
+x_train <- train_data[,1:14]
+y_train <- train_data$BTC_Change
+
+mlr_model1 <- lm(y_train ~ ., data = cbind(x_train, y_train))
+summary(mlr_model1)
+```
+
+```{r}
+# Evaluate model on test set
+x_test <- test_data[,1:14]
+y_test <- test_data$BTC_Change
+
+predictions <- predict(mlr_model1, newdata = cbind(x_test, y_test))
+
+MAE <- mean(abs(predictions - y_test))
+RMSE <- sqrt(mean((predictions - y_test)^2))
+R2 <- cor(predictions, y_test)^2
+
+cat("\nMAE:", MAE, "\n")
+cat("RMSE:", RMSE, "\n")
+cat("R2:", R2, "\n")
+```
+
+```{r}
+library(ggplot2)
+
+# Residuals vs Fitted values plot
+residuals <- residuals(mlr_model1)
+fitted_values <- fitted(mlr_model1)
+
+residuals_vs_fitted <- data.frame(Residuals = residuals, FittedValues = fitted_values)
+
+ggplot(residuals_vs_fitted, aes(x = FittedValues, y = Residuals)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, linetype = "dashed") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# Q-Q plot
+qqnorm(residuals, main = "Normal Q-Q Plot")
+qqline(residuals)
+```
+
+
+## 3 - model
+
+```{r}
+library(tidyverse)
+library(glmnet)
+
+# Load the data
+data <- btc_sentiments
+
+# Split the data into training and test sets
+set.seed(123)
+train_index <- sample(nrow(data), 0.7*nrow(data))
+train <- data[train_index, ]
+test <- data[-train_index, ]
+
+# Fit the Lasso regression model using cross-validation
+x <- model.matrix(BTC_Change ~ ., data = train)[,-1]
+y <- train$BTC_Change
+lasso_fit <- cv.glmnet(x, y, alpha = 1, standardize = TRUE)
+
+plot(lasso_fit)
+# Determine the optimal value of lambda and extract the coefficients
+best_lambda <- lasso_fit$lambda.min
+lasso_coef <- coef(lasso_fit, s = best_lambda)
+
+# Make predictions on the test set and calculate MSE
+pred <- predict(lasso_fit, newx = model.matrix(BTC_Change ~ ., data = test)[,-1], s = best_lambda)
+mse <- mean((test$BTC_Change - pred)^2)
+rmse <- sqrt(mse)
+mae <- mean(abs(test$BTC_Change - pred))
+
+# Print the coefficients
+print(lasso_coef)
+
+# Print the cross-validated mean squared error (CV-MSE), RMSE, and MAE
+cv_mse <- lasso_fit$cvm[lasso_fit$lambda == best_lambda]
+cv_rmse <- sqrt(cv_mse)
+cv_mae <- mean(abs(lasso_fit$fit[,lasso_fit$lambda == best_lambda] - y))
+print(paste0("CV-MSE = ", round(cv_mse, 2)))
+print(paste0("CV-RMSE = ", round(cv_rmse, 2)))
+print(paste0("CV-MAE = ", round(cv_mae, 2)))
+
+# Print the mean squared error (MSE), RMSE, and MAE on the test set
+print(paste0("MSE = ", round(mse, 2)))
+print(paste0("RMSE = ", round(rmse, 2)))
+print(paste0("MAE = ", round(mae, 2)))
+
+```
+
+
+```{r}
+# Plot the predicted versus actual values
+ggplot(data = test, aes(x = BTC_Change, y = pred)) + geom_point() + geom_abline() + ggtitle(paste0("MSE = ", round(mse, 2)))
+
+```
+
+
+```{r}
+# Fit a linear regression model for comparison
+lm_fit <- lm(BTC_Change ~ ., data = train)
+
+# Make predictions on the test set using both models
+lasso_pred <- predict(lasso_fit, newx = model.matrix(BTC_Change ~ ., data = test)[,-1], s = best_lambda)
+lm_pred <- predict(lm_fit, newdata = test)
+
+# Plot the residuals vs. fitted values for both models
+plot(lm_pred, test$BTC_Change - lm_pred, col = "blue", pch = 16, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values")
+points(lasso_pred, test$BTC_Change - lasso_pred, col = "red", pch = 16)
+legend("topright", c("Linear Regression", "Lasso Regression"), col = c("blue", "red"), pch = 16)
+
+```
+
+Based on the metrics provided, we can make the following comparisons between the models for BTC_Change prediction:
+
+- Random forest has the lowest MAE and RMSE values, indicating better performance in terms of predicting the outcome variable.
+- Linear regression has the highest R2 value, indicating the highest proportion of variance in the outcome variable that is explained by the predictor variables.
+- Lasso regression has a lower RMSE and MAE than random forest, indicating better performance in predicting the outcome variable. However, - - Lasso regression does feature a lower number of predictor variables compared to random forest and may be preferred if feature selection is a priority.
+- Overall, it seems that the random forest model performs the best for predicting the BTC_Change variable, similar to the ETH_Change prediction. However, Lasso regression may be a better option if feature selection is a priority.
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+### Part-1 : Multiple Linear Regression Model  
+```{r}
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(eth_sentiments$ETH_Change, p = 0.8, list = FALSE)
+train_data <- eth_sentiments[train_index, ]
+test_data <- eth_sentiments[-train_index, ]
+
+# Fit linear regression model
+lm_model <- lm(ETH_Change ~ ., data = train_data)
+
+# Predict on test set
+pred <- predict(lm_model, newdata = test_data)
+
+# Calculate accuracy and confusion matrix
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$ETH_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+conf_matrix1 <- confusionMatrix(pred_class, true_class)
+# Print confusion matrix
+conf_matrix1
+
+```
+
+```{r}
+# Plot confusion matrix
+conf_plot1 <- ggplot(data = as.data.frame(conf_matrix1$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot1)
+```
+- Based on the confusion matrix, the linear regression model has an accuracy of 89.58% in classifying the change in ETH price as "Up" or "Down". This means that 89.58% of the time, the model correctly predicts the direction of the change in ETH price.
+
+- The "Sensitivity" (also known as "True Positive Rate") is 91.67%, which means that the model correctly predicts 91.67% of the "Up" changes in ETH price.
+
+- The "Specificity" (also known as "True Negative Rate") is 87.50%, which means that the model correctly predicts 87.50% of the "Down" changes in ETH price.
+
+- The "Positive Predictive Value" (also known as "Precision") is 88.00%, which means that 88.00% of the time, when the model predicts an "Up" change, the actual change is indeed "Up".
+
+- The "Negative Predictive Value" is 91.30%, which means that 91.30% of the time, when the model predicts a "Down" change, the actual change is indeed "Down".
+
+- The "Kappa" statistic is 0.7917, which indicates a good agreement between the predicted and actual classifications. The "McNemar's Test P-Value" of 1 indicates that there is no significant difference between the two sets of predictions.
+
+- Overall, the results suggest that the linear regression model is a good fit for the data and is able to accurately predict the direction of change in ETH price.
+
+
+NEXT STEP: 
+- Based on the results of the linear regression model, we can make some inferences about the impact of sentiment predictors on the change in ETH price. However, the exact inferences would depend on the predictors included in the model and the coefficients associated with each predictor.
+
+- For example, if the model includes a sentiment predictor, and the coefficient for that predictor is significant and positive, we can infer that a positive sentiment is associated with an increase in ETH price. On the other hand, if the coefficient for that predictor is significant and negative, we can infer that a positive sentiment is associated with a decrease in ETH price.
+
+- However, it is important to note that these inferences are based on the linear regression model and may not hold true in the real world, as the relationship between sentiment and ETH price may be more complex than a simple linear relationship. Further analysis and experimentation may be necessary to fully understand the impact of sentiment on ETH price.
+
+
+```{r}
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(eth_sentiments$ETH_Change, p = 0.8, list = FALSE)
+train_data <- eth_sentiments[train_index, ]
+test_data <- eth_sentiments[-train_index, ]
+
+# Fit linear regression model
+lm_model <- lm(ETH_Change ~ `Negative Sentiment Summed`, data = train_data)
+
+# Predict on test set
+pred <- predict(lm_model, newdata = test_data)
+
+# Calculate accuracy and confusion matrix
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$ETH_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+conf_matrix2 <- confusionMatrix(pred_class, true_class)
+# Print confusion matrix
+conf_matrix2
+```
+
+```{r}
+# Plot confusion matrix
+conf_plot2 <- ggplot(data = as.data.frame(conf_matrix2$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot2)
+
+```
+- The results from the second confusion matrix indicate that the linear regression model is not a good fit for the data and is not able to accurately predict the direction of change in ETH price. The accuracy of the model is only 43.75%, which is much lower than the accuracy of the first model.
+
+- A low accuracy can be due to a number of reasons, such as a high variance in the data, the presence of outliers, or a poor choice of predictors. In this case, it may be that the three sentiment predictors (Positive Sentiment Averaged, Negative Sentiment Averaged, and Overall Sentiment Averaged) are not strong enough predictors of ETH price change, or that they are not properly capturing the relationship between sentiment and ETH price.
+
+- The "Kappa" statistic is negative (-0.2083), which indicates that the predictions made by the model are worse than random chance. The "Positive Predictive Value" (40.74%) and "Negative Predictive Value" (38.10%) are also very low, indicating that the model is not making accurate predictions for either class.
+
+- The "Sensitivity" (45.83%) and "Specificity" (33.33%) are also quite low, which means that the model is not accurately predicting either the "Up" changes or the "Down" changes in ETH price.
+
+- Overall, the results suggest that the linear regression model is not a good fit for the data and that a different model or a different set of predictors may need to be used to accurately predict the direction of change in ETH price.
+
+NEXT STEP MOTIVATION
+Questiom: can we conclude here just sentiment is not enough to predict price change??
+Answer: 
+Based on the results of the second linear regression model, we can conclude that sentiment alone is not enough to accurately predict the change in ETH price. While sentiment may play a role in the change in ETH price, it is likely that there are other factors that are also affecting the price.
+
+It is important to keep in mind that the results of a single model do not necessarily represent the entire relationship between sentiment and ETH price. Further analysis, experimentation, and the inclusion of other relevant predictors may be necessary to fully understand the impact of sentiment on ETH price.
+
+Additionally, the results of this model may not generalize to other time periods or to other cryptocurrencies, as the relationship between sentiment and price can vary depending on the specific context.
+
+Lets implement LASSO? Why?
+- Lasso regression is a type of regularized linear regression that can be useful for reducing the number of predictors in a model and for selecting the most important predictors. In some cases, Lasso regression can improve the accuracy of a model by reducing overfitting and by mitigating the effects of collinearity between predictors.
+
+- In this case, it may be worth exploring whether Lasso regression can improve the accuracy of the predictions for the change in ETH price. If the results of the linear regression model indicate that there are many predictors that are not contributing to the accuracy of the model, Lasso regression could potentially reduce the number of predictors and improve the accuracy of the predictions.
+
+- If Lasso regression does not lead to improved results, there are other modeling techniques that could be considered, such as decision trees, random forests, gradient boosting, support vector machines, or neural networks. The choice of modeling technique will depend on the specific characteristics of the data, the research question, and the goals of the analysis.
+
+- It may also be worth considering the inclusion of additional predictors, such as market data, economic indicators, or technical indicators, as these factors may play a role in the change in ETH price and could potentially improve the accuracy of the predictions.
+
+## PART 2 : LASSO REGRESSION Model
+
+```{r}
+library(glmnet)
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(eth_sentiments$ETH_Change, p = 0.7, list = FALSE)
+train_data <- eth_sentiments[train_index, ]
+test_data <- eth_sentiments[-train_index, ]
+
+# Extract the predictors and response variable
+X <- as.matrix(train_data[c("Negative Sentiment Summed", "ETH_Change")])
+y <- train_data$ETH_Change
+
+# Standardize the predictors
+X <- scale(X)
+
+# Perform lasso regression with 10-fold cross-validation
+fit <- cv.glmnet(X, y, alpha = 1, nfolds = 10)
+
+# Get the optimal value of lambda
+lambda_opt <- fit$lambda.min
+
+# Refit the model using the optimal lambda value
+lasso_model <- glmnet(X, y, alpha = 1, lambda = lambda_opt)
+
+# print the coefficients
+coef(lasso_model)
+
+```
+```{r}
+# Predict on test set
+X_test <- as.matrix(test_data[c("Negative Sentiment Summed", "ETH_Change")])
+X_test <- scale(X_test)
+pred <- predict(lasso_model, newx = X_test)
+
+# Convert predictions to class labels (Up or Down) based on threshold of 0
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$ETH_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+
+# Compute accuracy and confusion matrix
+conf_matrix3 <- confusionMatrix(pred_class, true_class)
+accuracy <- conf_matrix3$overall["Accuracy"]
+
+# Print accuracy and confusion matrix
+print(accuracy)
+print(conf_matrix3$table)
+
+conf_matrix3
+```
+```{r}
+# Plot confusion matrix
+conf_plot3 <- ggplot(data = as.data.frame(conf_matrix3$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot3)
+```
+The output "3 x 1 sparse Matrix of class "dgCMatrix"" represents the coefficients of the Lasso regression model. The coefficients are the estimates of the parameters of the linear regression model that relate the predictors to the response variable.
+
+In this case, the model has three coefficients:
+- (Intercept): This is the constant term in the regression equation. It represents the expected value of the response variable when all the predictors are equal to zero. The coefficient for the intercept is 0.1842222.
+- Negative Sentiment Summed: This is the coefficient for the predictor "Negative Sentiment Summed". The coefficient for this predictor is not present in the output, which suggests that it was excluded from the model due to the Lasso regularization.
+- ETH_Change: This is the coefficient for the predictor "ETH_Change". The coefficient for this predictor is 6.1774731.
+
+The coefficients of the Lasso regression model can be used to make predictions about the response variable based on the values of the predictors. For example, if the values of the predictors are known, the regression equation can be used to calculate the expected value of the response variable.
+
+The accuracy of 0.9027778 indicates that the Lasso regression model is correct 90.28% of the time in classifying the change in XRP price as either "Up" or "Down". The confusion matrix further breaks down the performance of the model, showing the number of true positive predictions (30), true negative predictions (35), false positive predictions (0), and false negative predictions (7).
+
+The high accuracy, combined with the low number of false positive and false negative predictions, suggests that the Lasso regression model is making accurate predictions about the change in XRP price. The results of the model can be used to make informed decisions based on the values of the predictors.
+
+However, it is important to keep in mind that the accuracy of a model is not the only factor to consider when evaluating its performance. Other metrics, such as precision, recall, F1-score, and AUC (area under the receiver operating characteristic curve), can provide a more complete picture of the performance of a binary classification model.
+
+NEXT STEP MOTIVATION: 
+lets look for LASSO including all predictors 
+
+
+```{r}
+library(glmnet)
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(eth_sentiments$ETH_Change, p = 0.7, list = FALSE)
+train_data <- eth_sentiments[train_index, ]
+test_data <- eth_sentiments[-train_index, ]
+
+# Extract the predictors and response variable
+X <- as.matrix(train_data[, -1])
+y <- train_data$ETH_Change
+
+# Standardize the predictors
+X <- scale(X)
+
+# Perform lasso regression with 10-fold cross-validation
+fit <- cv.glmnet(X, y, alpha = 1, nfolds = 10)
+
+# Get the optimal value of lambda
+lambda_opt <- fit$lambda.min
+
+# Refit the model using the optimal lambda value
+lasso_model <- glmnet(X, y, alpha = 1, lambda = lambda_opt)
+
+# print the coefficients
+coef(lasso_model)
+```
+
+```{r}
+# Predict on test set
+X_test <- as.matrix(test_data[, -1])
+X_test <- scale(X_test)
+pred <- predict(lasso_model, newx = X_test)
+
+# Convert predictions to class labels (Up or Down) based on threshold of 0
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$ETH_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+
+# Compute accuracy and confusion matrix
+conf_matrix4 <- confusionMatrix(pred_class, true_class)
+accuracy <- conf_matrix4$overall["Accuracy"]
+
+# Print accuracy and confusion matrix
+print(accuracy)
+print(conf_matrix4$table)
+
+```
+```{r}
+# Plot confusion matrix
+conf_plot4 <- ggplot(data = as.data.frame(conf_matrix4$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot4)
+
+```
+The coefficients for most of the predictors (Positive Sentiment Summed, Positive Sentiment RMS, Negative Sentiment Averaged, Negative Sentiment Summed, Negative Sentiment RMS, Overall Sentiment Averaged, Overall Sentiment Summed, Overall Sentiment RMS, ETH_High, ETH_Low, ETH_Open, ETH_Price, ETH_Vol) are not present in the output, which suggests that they were excluded from the model due to the Lasso regularization.
+
+The results of the Lasso regression indicate that, of all the predictors, only the predictor ETH_Change is important for predicting the response variable ETH_Change. The coefficients for the other predictors were shrunk towards zero by the Lasso regularization and excluded from the model, indicating that they are not important for predicting the response variable.
+
+NEXT STEPS
+Maybe we check on other coins.
+
+5. BTC - Multiple Linear regression (Specific cols)
+```{r}
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(btc_sentiments$BTC_Change, p = 0.8, list = FALSE)
+train_data <- btc_sentiments[train_index, ]
+test_data <- btc_sentiments[-train_index, ]
+
+# Fit linear regression model
+lm_model <- lm(BTC_Change ~ ., data = train_data)
+
+# Predict on test set
+pred <- predict(lm_model, newdata = test_data)
+
+# Calculate accuracy and confusion matrix
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$BTC_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+conf_matrix5 <- confusionMatrix(pred_class, true_class)
+# Print confusion matrix
+conf_matrix5
+```
+```{r}
+# Plot confusion matrix
+conf_plot5 <- ggplot(data = as.data.frame(conf_matrix5$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot5)
+
+```
+
+
+6. BTC - Lasso regression (Specific cols)
+```{r}
+library(glmnet)
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(btc_sentiments$BTC_Change, p = 0.7, list = FALSE)
+train_data <- btc_sentiments[train_index, ]
+test_data <- btc_sentiments[-train_index, ]
+
+# Extract the predictors and response variable
+X <- as.matrix(train_data[c("Overall Sentiment Averaged", "BTC_Change")])
+y <- train_data$BTC_Change
+
+# Standardize the predictors
+X <- scale(X)
+
+# Perform lasso regression with 10-fold cross-validation
+fit <- cv.glmnet(X, y, alpha = 1, nfolds = 10)
+
+# Get the optimal value of lambda
+lambda_opt <- fit$lambda.min
+
+# Refit the model using the optimal lambda value
+lasso_model <- glmnet(X, y, alpha = 1, lambda = lambda_opt)
+
+# print the coefficients
+coef(lasso_model)
+```
+```{r}
+# Predict on test set
+X_test <- as.matrix(test_data[c("Overall Sentiment Averaged", "BTC_Change")])
+X_test <- scale(X_test)
+pred <- predict(lasso_model, newx = X_test)
+
+# Convert predictions to class labels (Up or Down) based on threshold of 0
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$BTC_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+
+# Compute accuracy and confusion matrix
+conf_matrix6 <- confusionMatrix(pred_class, true_class)
+accuracy <- conf_matrix6$overall["Accuracy"]
+
+# Print accuracy and confusion matrix
+print(accuracy)
+print(conf_matrix6$table)
+```
+```{r}
+# Plot confusion matrix
+conf_plot6 <- ggplot(data = as.data.frame(conf_matrix6$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot6)
+```
+
+
+
+7. XRP - Multiple Linear regression (Specific cols)
+```{r}
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(xrp_sentiments$XRP_Change, p = 0.8, list = FALSE)
+train_data <- xrp_sentiments[train_index, ]
+test_data <- xrp_sentiments[-train_index, ]
+
+# Fit linear regression model
+lm_model <- lm(XRP_Change ~ ``, data = train_data)
+
+# Predict on test set
+pred <- predict(lm_model, newdata = test_data)
+
+# Calculate accuracy and confusion matrix
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$XRP_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+conf_matrix7 <- confusionMatrix(pred_class, true_class)
+# Print confusion matrix
+conf_matrix7
+```
+```{r}
+# Plot confusion matrix
+conf_plot7 <- ggplot(data = as.data.frame(conf_matrix7$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot7)
+
+
+```
+8. XRP - Lasso regression (Specific cols)
+```{r}
+
+library(glmnet)
+library(caret)
+
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(xrp_sentiments$XRP_Change, p = 0.7, list = FALSE)
+train_data <- xrp_sentiments[train_index, ]
+test_data <- xrp_sentiments[-train_index, ]
+
+# Extract the predictors and response variable
+X <- as.matrix(train_data[c("Overall Sentiment Averaged", "XRP_Change")])
+y <- train_data$XRP_Change
+
+# Standardize the predictors
+X <- scale(X)
+
+# Perform lasso regression with 10-fold cross-validation
+fit <- cv.glmnet(X, y, alpha = 1, nfolds = 10)
+
+# Get the optimal value of lambda
+lambda_opt <- fit$lambda.min
+
+# Refit the model using the optimal lambda value
+lasso_model <- glmnet(X, y, alpha = 1, lambda = lambda_opt)
+
+# print the coefficients
+coef(lasso_model)
+```
+
+```{r}
+# Predict on test set
+X_test <- as.matrix(test_data[c("Overall Sentiment Averaged", "XRP_Change")])
+X_test <- scale(X_test)
+pred <- predict(lasso_model, newx = X_test)
+
+# Convert predictions to class labels (Up or Down) based on threshold of 0
+pred_class <- factor(ifelse(pred > 0, "Up", "Down"), levels = c("Up", "Down"))
+true_class <- factor(ifelse(test_data$XRP_Change > 0, "Up", "Down"), levels = c("Up", "Down"))
+
+# Compute accuracy and confusion matrix
+conf_matrix8 <- confusionMatrix(pred_class, true_class)
+accuracy <- conf_matrix8$overall["Accuracy"]
+
+# Print accuracy and confusion matrix
+print(accuracy)
+print(conf_matrix8$table)
+```
+
+```{r}
+# Plot confusion matrix
+conf_plot8 <- ggplot(data = as.data.frame(conf_matrix8$table), aes(x = Reference, y = Prediction)) +
+  geom_tile(aes(fill = Freq), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey") +
+  geom_text(aes(label = Freq)) +  # add text labels
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(vjust = 0.5)) +
+  labs(title = "Confusion Matrix",
+       x = "True Label",
+       y = "Predicted Label",
+       fill = "Frequency")
+
+print(conf_plot6)
+```
+
+### Forecasting 
+1. XRP data 
+2. Bitcoin Data
+3. ETH data
+```{r}
+library(forecast)
+library(tidyverse)
+
+# subset XRP/BTC/ETH price data
+xrp_prices <- df$XRP_Price
+btc_prices <- df$BTC_Price
+eth_prices <- df$ETH_Price
+
+# create time series object
+ts_xrp <- ts(xrp_prices, frequency = 7)
+ts_btc <- ts(btc_prices, frequency = 7)
+ts_eth <- ts(eth_prices, frequency = 7)
+
+# fit ARIMA model
+arima_model_xrp <- auto.arima(ts_xrp)
+arima_model_btc <- auto.arima(ts_btc)
+arima_model_eth <- auto.arima(ts_eth)
+
+# print model summary
+summary(arima_model_xrp)
+
+# make predictions for the next 7 days
+forecast_arima_xrp <- forecast(arima_model_xrp, h = 7)
+forecast_arima_btc <- forecast(arima_model_btc, h = 7)
+forecast_arima_eth <- forecast(arima_model_eth, h = 7)
+
+# print forecast
+print(forecast_arima_xrp)
+```
+
+
+The output shows the point forecasts along with their upper and lower bounds at 80% and 95% confidence intervals.
+
+For each time point, there is a point forecast (which is the estimated value for that time point), along with the lower and upper bounds for the forecast at the specified confidence level. The point forecast is the estimated value for the time series at that particular time point.
+
+The upper and lower bounds at the 80% and 95% confidence intervals give an idea of the range within which the actual value for that time point could fall. The wider the range, the less certain the forecast is. If the actual value falls outside the range, it may indicate that the model did not accurately capture all the underlying patterns in the data.
+
+Overall, this output provides valuable information on the model's forecasted values and the degree of uncertainty around those forecasts.
+
+```{r}
+# Plot the forecast
+plot(forecast_arima_xrp, xlab = "Time", ylab = "XRP Price",
+     main = "ARIMA forecast of XRP Price with 80% and 95% Prediction Intervals")
+
+```
+```{r}
+# Plot the forecast
+plot(forecast_arima_btc, xlab = "Time", ylab = "BTC Price",
+     main = "ARIMA forecast of BTC Price with 80% and 95% Prediction Intervals")
+```
+```{r}
+# Plot the forecast
+plot(forecast_arima_eth, xlab = "Time", ylab = "ETH Price",
+     main = "ARIMA forecast of ETH Price with 80% and 95% Prediction Intervals")
+```
+## Forecasting model 2 - exponential smoothing model
+to implement an exponential smoothing model for time series forecasting using the same XRP/BTC/ETH price data. 
+```{r}
+library(forecast)
+library(tidyverse)
+
+# subset XRP/BTC/ETH price data
+xrp_prices <- df$XRP_Price
+btc_prices <- df$BTC_Price
+eth_prices <- df$ETH_Price
+
+# create time series object
+ts_xrp <- ts(xrp_prices, frequency = 7)
+ts_btc <- ts(btc_prices, frequency = 7)
+ts_eth <- ts(eth_prices, frequency = 7)
+
+
+# fit exponential smoothing model
+ets_model_xrp <- ets(ts_xrp)
+ets_model_btc <- ets(ts_btc)
+ets_model_eth <- ets(ts_eth)
+
+# print model summary
+summary(ets_model_xrp)
+
+# make predictions for the next 7 days
+forecast_ets_xrp <- forecast(ets_model_xrp, h = 7)
+forecast_ets_btc <- forecast(ets_model_btc, h = 7)
+forecast_ets_eth <- forecast(ets_model_eth, h = 7)
+
+# print forecast
+print(forecast_ets_xrp)
+
+```
+```{r}
+# plot forecasted values
+autoplot(forecast_ets_xrp) + xlab("Date") + ylab("XRP Price") + ggtitle("XRP Price Forecast")
+autoplot(forecast_ets_btc) + xlab("Date") + ylab("BTC Price") + ggtitle("BTC Price Forecast")
+autoplot(forecast_ets_eth) + xlab("Date") + ylab("ETH Price") + ggtitle("ETH Price Forecast")
+```
+### naive method for time series forecasting using the same XRP/BTC/ETH price data:
+
+```{r}
+library(forecast)
+library(tidyverse)
+
+# subset XRP/BTC/ETH price data
+xrp_prices <- df$XRP_Price
+btc_prices <- df$BTC_Price
+eth_prices <- df$ETH_Price
+
+# create time series object
+ts_xrp <- ts(xrp_prices, frequency = 7)
+ts_btc <- ts(btc_prices, frequency = 7)
+ts_eth <- ts(eth_prices, frequency = 7)
+
+# fit naive model
+naive_model_xrp <- snaive(ts_xrp)
+naive_model_btc <- snaive(ts_btc)
+naive_model_eth <- snaive(ts_eth)
+
+# print model summary
+summary(naive_model_xrp)
+
+# make predictions for the next 7 days
+forecast_naive_xrp <- forecast(naive_model_xrp, h = 7)
+forecast_naive_btc <- forecast(naive_model_btc, h = 7)
+forecast_naive_eth <- forecast(naive_model_eth, h = 7)
+
+# print forecast
+print(forecast_naive_xrp)
+
+```
+
+```{r}
+# plot forecasted values
+autoplot(forecast_naive_xrp) + xlab("Date") + ylab("XRP Price") + ggtitle("XRP Price Forecast - Naive Method")
+autoplot(forecast_naive_btc) + xlab("Date") + ylab("BTC Price") + ggtitle("BTC Price Forecast - Naive Method")
+autoplot(forecast_naive_eth) + xlab("Date") + ylab("ETH Price") + ggtitle("ETH Price Forecast - Naive Method")
+```
+To determine which forecasting method is better among ARIMA, seasonal naive method, and exponential smoothing model, we can compare their error measures and AIC/BIC values.
+
+For ARIMA:
+
+AIC=-464.25, AICc=-464.23, BIC=-460.72
+Training set RMSE = 0.09575035
+For Exponential Smoothing:
+
+AIC=-170.7379, AICc=-170.4950, BIC=-153.0710
+Training set RMSE = 0.09678306
+For Seasonal Naive Method:
+
+Training set RMSE = 0.2995429
+Based on the AIC/BIC values, the Exponential Smoothing model has the lowest AIC/BIC value, indicating that it provides the best balance between goodness-of-fit and model complexity.
+
+Based on the RMSE values, the ARIMA model has the lowest training set RMSE, indicating that it provides the best fit to the training data.
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------
+### MODEL TRAINING
+For creating predicitve models, we will utilize deep neural networks. The functions to perform forwrard prop and backward prop are contained in the script file dnn_helper_functions. These functions are modified functions from my code utilized in my Deep Learning course on Coursera with Andrew Ng. You can see those notebooks HERE on my github for in depth details on how these functions work
+
+```{r}
+dnn_model <- function(X, Y, layers_dims, learning_rate = 0.0075, lambd = 0.1, num_iterations = 3000, print_cost = TRUE){
+  
+  set.seed(1)
+  costs <- c()
+  
+  #initialize parameters
+  parameters <- initialize_parameters_deep(layers_dims)
+  
+  score <- 0
+  c <- 100
+  
+  #Loop (gradient descent)
+  for (i in 1:num_iterations) {
+    
+    #Forward Propagation: [LINEAR->RELU]*(L-1) -> LINEAR -> SIGMOID.
+    output <- L_model_forward(X, parameters, layers_dims)
+    AL <- output[[1]]
+    caches <- output[[2]]
+    
+    
+    
+    #Compute Cost
+    cost <- compute_cost(AL, Y, lambd, caches)
+    if (cost < c) {
+      iteration <- i
+      c <- cost
+      p <- parameters
+    }
+    
+    #Backward Propagation
+    grads <- L_model_backward(AL, Y, lambd, caches)
+    
+    #Update Parameters
+    parameters <- update_parameters(parameters, grads, learning_rate)
+    
+    #Print cost every 100 training examples
+    if (print_cost && i %% 200 == 0) {
+      cat(paste0("Cost after iteration ", i, ": ", cost, "\n"))
+    }
+    
+    costs <- c(costs, cost)
+}
+  
+  plot(costs, type="l", xlab="iterations", ylab="Cost", main=paste("Model:", layers_dims, "Learning rate:", learning_rate, "Lambda:", lambd))
+
+  
+  return(parameters)
+
+}
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(caret)
+
+make_xy <- function(df, cuts = 50, one_hots = TRUE, future_price = 1) {
+  # Set the dependent variable as XRP Price and shift it up by "future_price" days so as to represent predicting the future price in "future_price" days
+  y <- df$XRP_Price[-c((nrow(df) - future_price + 1):nrow(df))]
+  
+  # Set the independent variables as everything else
+  X <- df[-c(1:future_price), -1]
+  
+  # Instantiate a scaler
+  xscaler <- caret::preProcess(X, method = "range")
+  
+  # Function to create "one hot" arrays for each dependent variable (XRP Price)
+  one_hot <- function(y, cuts = 50) {
+    data <- cut(y, breaks = cuts, labels = FALSE, include.lowest = TRUE)
+    y_one_hot <- matrix(0, nrow = length(y), ncol = cuts)
+    
+    for (pos in seq_along(y)) {
+      y_one_hot[pos, data[pos]] <- 1
+    }
+    
+    return(list(y_one_hot, data, levels(cut(y, breaks = cuts, include.lowest = TRUE))))
+  }
+  
+  # Scale independent variables
+  X <- predict(xscaler, X)
+  
+  if (one_hots) {
+    one_hot_data <- one_hot(y, cuts = cuts)
+    y <- one_hot_data[[1]]
+    data <- one_hot_data[[2]]
+    bins <- one_hot_data[[3]]
+    return(list(X, y, data, bins))
+  } else {
+    yscaler <- caret::preProcess(y, method = "range")
+    y <- predict(yscaler, y)
+    return(list(X, y, xscaler, yscaler))
+  }
+}
+
+```
+
+
+```{r}
+result <- make_xy(df, one_hots = TRUE)
+X <- result[[1]]
+Y <- result[[2]]
+data <- result[[3]]
+bins <- result[[4]]
+
+bins_list <- list()
+
+for (i in 1:(length(bins)-1)) {
+  bins_list[[i]] <- c(bins[i])
+}
+
+for (pos in seq_along(bins_list)) {
+  i <- bins_list[[pos]]
+  print(paste(pos, i))
+}
+
+
+```
+
+```{r}
+cat(sprintf('Dependent Variable Y at Position 151: $%s\n', df$XRP_Price[152]))
+cat(sprintf('One-Hot Vector Representation for Dependent Variable Y at Position 151:\n'))
+print(Y[152,])
+cat(sprintf('\nVector Position of Value 1 in One-Hot Vector for Dependent Variable Y at Position 151: %s', which.max(Y[152,])))
+
+```
+
+```{r}
+library(caret)
+
+set.seed(42)
+
+split <- createDataPartition(Y, times = 1, p = 0.6, list = FALSE)
+X_train <- X[split,]
+X_test <- X[-split,]
+y_train <- Y[split]
+y_test <- Y[-split]
+
+cat(paste("Training Input Size: ", dim(X_train), "\n",
+          "Training Output Size: ", dim(y_train), "\n",
+          "Testing Input Size: ", dim(X_test), "\n",
+          "Testing Output Size: ", dim(y_test), "\n"))
+
+```
+
+```{r}
+
+library(caret)
+
+set.seed(42)
+
+split <- createDataPartition(Y, times = 1, p = 0.6, list = FALSE)
+X_train <- X[split,]
+X_test <- X[-split,]
+y_train <- Y[split]
+y_test <- Y[-split]
+
+# Training data dimensions
+cat("Training Input Size: ", dim(X_train), "\n")
+cat("Training Output Size: ", dim(X_test), "\n")
+
+# Testing data dimensions
+cat("Testing Input Size: ", dim(y_train), "\n")
+cat("Testing Output Size: ", dim(y_test), "\n")
+
+```
+
+With a 60% Training Set size, we can see that our input independent variables X (X_train) has 151 samples, each with 29 features. Our output dependent variable y (y_train) has also 151 samples corresponding to each 151 input samples and 50 output responses. This corresponds to the 50 "one-hot" bin encoding we performed above. We would expect to see 49 of the 50 output responses to be 0 and one of the 50 to be equal to 1. As a result of this, our output layer L needs to be of size 50. Also note that our model expects the features to be the rows, and each observation to be a column. Because of this, when feeding X into our model, we will have to transpose it so it is of shape (29,151). We also need to choose our Neural Network's architectural structure. Our function has an arguement "layers_dims". This arguement accepts a list of any length, but at least 2. The first number must always be the number of input features. The last number must always be the size of our dependent variable y. If y for every observation is a single number, then it would be 1. In our current case, y for every observation is size 50 since it is one hot encoded for 50 different price ranges. Therefore our output layer size is 50. Everything else in between is fair game. For starters, let's start off with a model that has our input layer of size 29 for 29 features, 2 hidden layers of size 50 and 40, and our output layer of 50
+
+
+```{r}
+# Train the model and return the best parameters
+parameters <- dnn_model(t(X_train), t(y_train), layers_dims = c(29, 50, 40, 50), 
+                        learning_rate = 0.0075, lambd = 0, num_iterations = 10000, 
+                        print_cost = TRUE)
+
+# Test the model on the Training Set
+AL <- L_model_forward(t(X_train), parameters, c(29, 50, 40, 50))
+
+# Test the model on the Test Set
+AL_test <- L_model_forward(t(X_test), parameters, c(29, 50, 40, 50))
+
+# Calculate Accuracy of the Training Set
+train_score <- accuracy(AL, t(y_train))
+train_df <- accuracy_df(AL, t(y_train))
+
+# Calculate Accuracy of the Test Set
+test_score <- accuracy(AL_test, t(y_test))
+test_df <- accuracy_df(AL_test, t(y_test))
+
+cat("This Model's Train Set Accuracy is: ", train_score, "\n")
+cat("This Model's Test Set Accuracy is: ", test_score, "\n")
+
+```
+
+```{r}
+# Train the model and return the best parameters
+parameters <- dnn_model(t(X_train), t(y_train), layers_dims = c(29, 50, 40, 50), 
+                        learning_rate = 0.0075, lambd = 0, num_iterations = 10000, 
+                        print_cost = TRUE)
+
+# Test the model on the Training Set
+AL <- L_model_forward(t(X_train), parameters, c(29, 50, 40, 50))
+
+# Test the model on the Test Set
+AL_test <- L_model_forward(t(X_test), parameters, c(29, 50, 40, 50))
+
+# Calculate Accuracy of the Training Set
+train_score <- accuracy(AL, t(y_train))
+train_df <- accuracy_df(AL, t(y_train))
+
+# Calculate Accuracy of the Test Set
+test_score <- accuracy(AL_test, t(y_test))
+test_df <- accuracy_df(AL_test, t(y_test))
+
+```
+
+```{r}
+cat(paste("This Model's Train Set Accuracy is: ", train_score, "\n"))
+cat(paste("This Model's Test Set Accuracy is: ", test_score, "\n"))
+```
+
+
+Not too bad for the first dry run for our NN. As we can see, the model achieved 70% accuracy on the Training Set and 50% accuracy on the test set. However with 30% and 50% error respectively, our model is suffering from both High Bias and High Variance. It is doing poorly on the training set, and therefore has high bias, and its performance on the test set is even worse, so it also has high variance. Because of this, regularization won't help very much since there is already high bias on the training set, and adding more training data won't help either (not that we really have more anyways). Our options are now as follows:
+
+Increase the model size: This technizque reduces bias, since it should allow you to fit the training set better
+Reduce or eliminate regularization
+Modify model architecture
+Another thing to note is the cost value. After iteration 9800, we can see it is only at 1.514454. Scanning back up, we can see that it was steadily decreasing without jumping up and down. Because of this we can either increase the number of iterations to train our model, or simply increase the learning rate. Increasing iterations can be computationally expenseive. Conversely, increasing the learning rate to too high of a value might prevent the cost from ever converging to the minimum. Nonetheless, it is a value we can tweak as well
+
+
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
